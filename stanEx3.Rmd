@@ -1,0 +1,606 @@
+---
+title: "stanEx3"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=T,warning=F,message=F)
+suppressWarnings(
+  suppressMessages(
+    suppressPackageStartupMessages({
+      library(stats)
+      library(MASS)
+      library(tidyverse)
+    })
+  )
+)
+options(scipen=100,digits=3)
+library(cmdstanr)
+options(mc.cores=parallel::detectCores())
+options(cmdstanr_max_rows=1000)
+library(gridExtra)
+```
+
+
+ex8
+```
+non linear regression 
+with one explanatory variable  
+```
+```{r}
+fn=function(mdl,data,smp=500,wrm=100){
+mle=mdl$optimize(data=data)
+print(mle)
+
+mcmc=goMCMC(mdl,data,smp,wrm)
+
+mcmc$metadata()$stan_variables
+seeMCMC(mcmc,'m')
+
+
+y0=mcmc$draws('y0')
+smy0=summary(y0)
+
+grid.arrange(
+  qplot(y,smy0$median,xlab='obs.',ylab='prd.')+geom_abline(intercept=0,slope=1))
+
+par(mfrow=c(1,2))
+hist(y-smy0$median,xlab='obs.-prd.',main='residual')
+density(y-smy0$median) |> plot(xlab='obs.-prd.',main='residual')
+
+
+m1=mcmc$draws('m1')
+smm1=summary(m1)
+y1=mcmc$draws('y1')
+smy1=summary(y1)
+
+xy=tibble(x=x1,m=smm1$median,ml5=smm1$q5,mu5=smm1$q95,yl5=smy1$q5,yu5=smy1$q95)
+
+qplot(x,y,col=I('red'))+
+  geom_line(aes(x=x,y=ml5),xy,col='darkgray')+
+  geom_line(aes(x=x,y=mu5),xy,col='darkgray')+
+  geom_line(aes(x=x,y=yl5),xy,col='lightgray')+
+  geom_line(aes(x=x,y=yu5),xy,col='lightgray')+
+  geom_line(aes(x=x,y=m),xy,col='black')
+}
+```
+
+```
+single linear regression
+```
+ex8-0.stan  
+```
+data{
+  int N;
+  vector[N] x;
+  vector[N] y;
+  int N1;
+  vector[N1] x1;
+}
+parameters{
+  real b0;
+  real b1;
+  real<lower=0> s;
+}
+model{
+  y~normal(b0+b1*x,s);
+}
+generated quantities{
+  vector[N] m0;
+  vector[N] y0;
+  for(i in 1:N){
+    m0[i]=b0+b1*x[i];
+    y0[i]=normal_rng(m0[i],s);
+  }
+  vector[N1] m1;
+  vector[N1] y1;
+  for(i in 1:N1){
+    m1[i]=b0+b1*x1[i];
+    y1[i]=normal_rng(m1[i],s);
+  }
+}
+```
+
+
+```{r}
+n=20
+x=runif(n,0,20)
+y=rnorm(n,x*2+5,5)
+qplot(x,y)
+n1=10
+x1=seq(min(x),max(x),length.out=n1) # new data fpr predcition
+data=list(N=n,x=x,y=y,N1=n1,x1=x1)
+
+mdl=cmdstan_model('./ex8-0.stan')
+fn(mdl,data)
+```
+
+```
+quadratic regression  
+y=b0+b2(x-b1)**2  
+```
+ex8-1.stan
+```
+data{
+  int N;
+  vector[N] x;
+  vector[N] y;
+  int N1;
+  vector[N1] x1;
+}
+parameters{
+  real b0;
+  real b1;
+  real b2;
+  real<lower=0> s;
+}
+model{
+  y~normal(b0+b2*(x-b1)^2,s);
+}
+generated quantities{
+  vector[N] m0;
+  vector[N] y0;
+  for(i in 1:N){
+    m0[i]=b0+b2*(x[i]-b1)^2;
+    y0[i]=normal_rng(m0[i],s);
+  }
+  vector[N1] m1;
+  vector[N1] y1;
+  for(i in 1:N1){
+    m1[i]=b0+b2*(x1[i]-b1)^2;
+    y1[i]=normal_rng(m1[i],s);
+  }
+}
+```
+
+
+```{r}
+n=20
+x=runif(n,0,9)
+y=rnorm(n,0.5*(x-4)**2+5,1)
+qplot(x,y)
+
+n1=10
+x1=seq(min(x),max(x),length.out=n1) # new data fpr predcition
+
+data=list(N=n,x=x,y=y,N1=n1,x1=x1)
+
+mdl=cmdstan_model('./ex8-1.stan')
+fn(mdl,data)
+```
+
+
+```
+both log regression  
+log y=b0+b1*log x   x,y>0
+y=exp b0 * x**b1
+```
+ex8-2.stan
+```
+data{
+  int N;
+  vector<lower=0>[N] x;
+  vector<lower=0>[N] y;
+  int N1;
+  vector<lower=0>[N1] x1;
+}
+parameters{
+  real b0;
+  real b1;
+  real<lower=0> s;
+}
+model{
+  y~lognormal(b0+b1*log(x),s);
+}
+generated quantities{
+  vector[N] m0;
+  vector<lower=0>[N] y0;
+  for(i in 1:N){
+    m0[i]=b0+b1*log(x[i]);
+    y0[i]=lognormal_rng(m0[i],s);
+  }
+  vector[N1] m1;
+  vector<lower=0>[N1] y1;
+  for(i in 1:N1){
+    m1[i]=b0+b1*log(x1[i]);
+    y1[i]=lognormal_rng(m1[i],s);
+  }
+}
+```
+
+
+```{r}
+n=20
+x=runif(n,0,10)
+y=exp(rnorm(n,log(x)*2+1,1))
+grid.arrange(qplot(x,y),
+             qplot(log(x),log(y)),
+             ncol=2)
+
+n1=10
+x1=seq(min(x),max(x),length.out=n1) # new data fpr predcition
+
+data=list(N=n,x=x,y=y,N1=n1,x1=x1)
+
+mdl=cmdstan_model('./ex8-2.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+mcmc$metadata()$stan_variables
+seeMCMC(mcmc,'m',ch=F)
+
+
+y0=mcmc$draws('y0')
+smy0=summary(y0)
+
+qplot(y,smy0$median,xlab='obs.',ylab='prd.')+geom_abline(intercept=0,slope=1)
+
+par(mfrow=c(1,2))
+hist(log(y)-log(smy0$median),xlab='obs.-prd.',main='residual')
+density(log(y)-log(smy0$median)) |> plot(xlab='obs.-prd.',main='residual')
+
+
+m1=mcmc$draws('m1')
+smm1=summary(m1)
+y1=mcmc$draws('y1')
+smy1=summary(y1)
+
+xy=tibble(x=x1,m=smm1$median,ml5=smm1$q5,mu5=smm1$q95,yl5=smy1$q5,yu5=smy1$q95)
+
+qplot(x,y,col=I('red'))+
+  geom_line(aes(x=x,y=exp(ml5)),xy,col='darkgray')+
+  geom_line(aes(x=x,y=exp(mu5)),xy,col='darkgray')+
+  geom_line(aes(x=x,y=yl5),xy,col='lightgray')+
+  geom_line(aes(x=x,y=yu5),xy,col='lightgray')+
+  geom_line(aes(x=x,y=exp(m)),xy,col='black')
+  
+
+qplot(log(x),log(y),col=I('red'))+
+  geom_line(aes(x=log(x),y=ml5),xy,col='darkgray')+
+  geom_line(aes(x=log(x),y=mu5),xy,col='darkgray')+
+  geom_line(aes(x=log(x),y=log(yl5)),xy,col='lightgray')+
+  geom_line(aes(x=log(x),y=log(yu5)),xy,col='lightgray')+
+  geom_line(aes(x=log(x),y=m),xy,col='black')
+```
+
+
+ex8-3
+```
+exponential increasing/decreasing  
+
+y=b0* exp b1* x -> y~N(b0* exp(b1*x),s)  
+log y=log b0+b1* x  -> y~logN(log b0 +b1*x,s)
+x,y>0,b0>0
+(x=0,y=b0)  
+b1>0 x->Infinity,y->Infinity  
+b1<0 x->Infinity,y->+0  
+```
+```{r}
+n=20
+x=runif(n,0,5)
+y=rnorm(n,10*exp(-2*x),0.5)
+grid.arrange(qplot(x,y),
+             qplot(x,log(y)),
+             ncol=2)
+
+n1=10
+x1=seq(min(x),max(x),length.out=n1) # new data fpr predcition
+
+data=list(N=n,x=x,y=y,N1=n1,x1=x1)
+```
+
+```
+y=b0* exp b1* x -> y~N(b0* exp(b1*x),s)  
+```
+ex8-3-1.stan
+```
+data{
+  int N;
+  vector[N] x;
+  vector[N] y;
+  int N1;
+  vector[N1] x1;
+}
+parameters{
+  real<lower=0> b0;
+  real b1;
+  real<lower=0> s;
+}
+model{
+  y~normal(b0*exp(b1*x),s);
+}
+generated quantities{
+  vector[N] m0;
+  vector[N] y0;
+  for(i in 1:N){
+    m0[i]=b0*exp(b1*x[i]);
+    y0[i]=normal_rng(m0[i],s);
+  }
+  vector[N1] m1;
+  vector[N1] y1;
+  for(i in 1:N1){
+    m1[i]=b0*exp(b1*x1[i]);
+    y1[i]=normal_rng(m1[i],s);
+  }
+}
+```
+
+
+```{r}
+mdl=cmdstan_model('./ex8-3-1.stan')
+fn(mdl,data)
+```
+
+```
+log y=log b0+b1* x  -> y~logN(log b0 +b1*x,s)
+```
+ex8-3-2.stan
+```
+data{
+  int N;
+  vector<lower=0>[N] x;
+  vector<lower=0>[N] y;
+  int N1;
+  vector[N1] x1;
+}
+parameters{
+  real<lower=0> b0;
+  real<lower=-10,upper=10> b1;
+  real<lower=0> s;
+}
+model{
+  y~lognormal(log(b0)+b1*x,s);
+}
+generated quantities{
+  vector[N] m0;
+  vector[N] y0;
+  for(i in 1:N){
+    m0[i]=log(b0)+b1*x[i];
+    y0[i]=lognormal_rng(m0[i],s);
+  }
+  vector[N1] m1;
+  vector[N1] y1;
+  for(i in 1:N1){
+    m1[i]=log(b0)+b1*x1[i];
+    y1[i]=lognormal_rng(m1[i],s);
+  }
+}
+```
+
+
+```{r}
+n=20
+x=runif(n,0,5)
+y=rlnorm(n,log(10)-2*x,0.5)
+grid.arrange(qplot(x,y),
+             qplot(x,log(y)),
+             ncol=2)
+
+n1=10
+x1=seq(min(x),max(x),length.out=n1) # new data fpr predcition
+
+data=list(N=n,x=x,y=y,N1=n1,x1=x1)
+mdl=cmdstan_model('./ex8-3-2.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+mcmc$metadata()$stan_variables
+seeMCMC(mcmc,'m',ch=F)
+
+
+y0=mcmc$draws('y0')
+smy0=summary(y0)
+
+qplot(y,smy0$median,xlab='obs.',ylab='prd.')+geom_abline(intercept=0,slope=1)
+
+par(mfrow=c(1,2))
+hist(y-smy0$median,xlab='obs.-prd.',main='residual')
+density(y-smy0$median) |> plot(xlab='obs.-prd.',main='residual')
+
+
+m1=mcmc$draws('m1')
+smm1=summary(m1)
+y1=mcmc$draws('y1')
+smy1=summary(y1)
+
+xy=tibble(x=x1,m=smm1$median,ml5=smm1$q5,mu5=smm1$q95,yl5=smy1$q5,yu5=smy1$q95)
+
+qplot(x,log(y),col=I('red'))+
+  geom_line(aes(x=x,y=ml5),xy,col='darkgray')+
+  geom_line(aes(x=x,y=mu5),xy,col='darkgray')+
+  geom_line(aes(x=x,y=log(yl5)),xy,col='lightgray')+
+  geom_line(aes(x=x,y=log(yu5)),xy,col='lightgray')+
+  geom_line(aes(x=x,y=m),xy,col='black')
+```
+
+
+ex8-4
+```
+growth curve  
+
+y=b0* (1-exp(-b1* x)) -> y~N(1-exp(-b1*x),s)  
+x,y>0, b0,b1>0
+(x=0,y=0), (x->Infinity,y->b0)
+```
+```
+data{
+  int N;
+  vector[N] x;
+  vector[N] y;
+  int N1;
+  vector[N1] x1;
+}
+parameters{
+  real<lower=0,upper=100> b0;
+  real<lower=0,upper=10> b1;
+  real<lower=0> s;
+}
+model{
+  y~normal(b0*(1-exp(-b1*x)),s);
+}
+generated quantities{
+  vector[N] m0;
+  vector[N] y0;
+  for(i in 1:N){
+    m0[i]=b0*(1-exp(-b1*x[i]));
+    y0[i]=normal_rng(m0[i],s);
+  }
+  vector[N1] m1;
+  vector[N1] y1;
+  for(i in 1:N1){
+    m1[i]=b0*(1-exp(-b1*x1[i]));
+    y1[i]=normal_rng(m1[i],s);
+  }
+}
+```
+
+
+```{r}
+n=20
+x=runif(n,0,9)
+y=rnorm(n,10*(1-exp(-0.5*x)),1)
+qplot(x,y)
+
+n1=10
+x1=seq(min(x),max(x),length.out=n1) # new data fpr predcition
+
+data=list(N=n,x=x,y=y,N1=n1,x1=x1)
+
+mdl=cmdstan_model('./ex8-4.stan')
+fn(mdl,data)
+```
+
+
+ex8-5
+```
+sigmoid curve
+
+y=Ym/ 1+exp(-b1* (x-b0)) -> y~B(Ym, 1+exp(-b1*(x-b0)))
+b0,b1>0
+x[0,Infinity), y[0,Ym]
+(x=b0, y=Ym/2)
+```
+```
+data{
+  int N;
+  vector[N] x;
+  int Ym;
+  array[N] int y;
+  int N1;
+  vector[N1] x1;
+}
+parameters{
+  real<lower=0,upper=100> b0;
+  real<lower=0,upper=100> b1;
+}
+model{
+  y~binomial_logit(Ym,b1*(x-b0));
+}
+generated quantities{
+  array[N] int y0;
+  for(i in 1:N){
+    y0[i]=binomial_rng(Ym,inv_logit(b1*x[i]-b0*b1));
+  }
+  array[N1] int y1;
+  for(i in 1:N1){
+    y1[i]=binomial_rng(Ym,inv_logit(b1*x1[i]-b0*b1));
+  }
+}
+```
+
+
+```{r}
+n=20
+x=runif(n,0,9)
+ym=10
+y=rbinom(n,ym,1/(1+exp(-2*(x-4))))
+qplot(x,y)
+
+n1=10
+x1=seq(min(x),max(x),length.out=n1) # new data fpr predcition
+
+data=list(N=n,x=x,y=y,Ym=ym,N1=n1,x1=x1)
+
+mdl=cmdstan_model('./ex8-5.stan')
+
+mcmc=goMCMC(mdl,data)
+mcmc$metadata()$stan_variables
+seeMCMC(mcmc,ch=F)
+
+y1=mcmc$draws('y1')
+smy1=summary(y1)
+
+xy=tibble(x=x1,ymed=smy1$median,yl5=smy1$q5,yu5=smy1$q95)
+
+qplot(x,y,col=I('red'))+
+  geom_line(aes(x=x,y=yl5),xy,col='lightgray')+
+  geom_line(aes(x=x,y=yu5),xy,col='lightgray')+
+  geom_line(aes(x=x,y=ymed),xy,col='black')
+```
+
+
+ex8-6
+```
+up and down
+
+y=b0(exp(-b1* x)-exp(-b2* x)) -> y~N(b0(exp(-b1* x)-exp(-b2* x)),s)
+b0,b1,b2>0, b1<b2
+x[0,Infinity), 0<y<b0
+(x=log b1-log b2 / b1-b2, y=max(y))
+```
+```
+data{
+  int N;
+  vector[N] x;
+  vector[N] y;
+  int N1;
+  vector[N1] x1;
+}
+parameters{
+  real<lower=0,upper=200> b0;
+  real<lower=0,upper=1> b1;
+  real<lower=0,upper=1> b2;
+  real<lower=0,upper=10> s;
+}
+model{
+  y~normal(b0*(exp(-b1*x)-exp(-b2*x)),s);
+}
+generated quantities{
+  vector[N] m0;
+  vector[N] y0;
+  for(i in 1:N){
+    m0[i]=b0*(exp(-b1*x[i])-exp(-b2*x[i]));
+    y0[i]=normal_rng(m0[i],s);
+  }
+  vector[N1] m1;
+  vector[N1] y1;
+  for(i in 1:N1){
+    m1[i]=b0*(exp(-b1*x1[i])-exp(-b2*x1[i]));
+    y1[i]=normal_rng(m1[i],s);
+  }
+}
+```
+
+
+```{r}
+n=20
+x=runif(n,0,50)
+y=rnorm(n,100*(exp(-0.03*x)-exp(-0.2*x)),1)
+qplot(x,y)
+
+n1=10
+x1=seq(min(x),max(x),length.out=n1) # new data fpr predcition
+
+data=list(N=n,x=x,y=y,N1=n1,x1=x1)
+
+mdl=cmdstan_model('./ex8-6.stan')
+
+fn(mdl,data)
+```
+

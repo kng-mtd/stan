@@ -1,0 +1,465 @@
+---
+title: "stanEx5"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=T,warning=F,message=F)
+suppressWarnings(
+  suppressMessages(
+    suppressPackageStartupMessages({
+      library(stats)
+      library(MASS)
+      library(tidyverse)
+    })
+  )
+)
+options(scipen=100,digits=3)
+library(cmdstanr)
+options(mc.cores=parallel::detectCores())
+options(cmdstanr_max_rows=1000)
+library(gridExtra)
+```
+
+
+```{r}
+fn=function(mdl,data,smp=500,wrm=100){
+mle=mdl$optimize(data=data)
+print(mle)
+
+mcmc=goMCMC(mdl,data,smp,wrm)
+
+mcmc$metadata()$stan_variables
+seeMCMC(mcmc,'m')
+
+
+y0=mcmc$draws('y0')
+smy0=summary(y0)
+
+grid.arrange(
+  qplot(y,smy0$median,xlab='obs.',ylab='prd.')+geom_abline(intercept=0,slope=1))
+
+par(mfrow=c(1,2))
+hist(y-smy0$median,xlab='obs.-prd.',main='residual')
+density(y-smy0$median) |> plot(xlab='obs.-prd.',main='residual')
+
+
+m1=mcmc$draws('m1')
+smm1=summary(m1)
+y1=mcmc$draws('y1')
+smy1=summary(y1)
+
+xy=tibble(x=x1,m=smm1$median,ml5=smm1$q5,mu5=smm1$q95,yl5=smy1$q5,yu5=smy1$q95)
+
+qplot(x,y,col=I('red'))+
+  geom_line(aes(x=x,y=ml5),xy,col='darkgray')+
+  geom_line(aes(x=x,y=mu5),xy,col='darkgray')+
+  geom_line(aes(x=x,y=yl5),xy,col='lightgray')+
+  geom_line(aes(x=x,y=yu5),xy,col='lightgray')+
+  geom_line(aes(x=x,y=m),xy,col='black')
+}
+```
+
+
+ex12  
+```
+hierarchical model  
+class c=1~k 
+b0c~N(b00,sb0)  
+b1c~N(b10,sb1)  
+yc~N(b0c+b1c*x,s)
+```
+
+```{r}
+n=50
+k=9
+x=runif(n,0,20)
+c=sample(letters[1:k],n,replace=T)
+b00=rnorm(k,10,5)
+b0=b00[factor(c)]
+b10=rnorm(k,2,1)
+b1=b10[factor(c)]
+y=rnorm(n,b0+b1*x,5)
+qplot(x,y,shape=c,size=I(2))+
+  scale_shape_manual(values=1:k)
+qplot(x,y,col=c)
+
+n1=10
+x1=seq(min(x),max(x),length.out=n1) # new data fpr predcition
+```
+
+```
+estimate as no class
+y~N(b00+b10*x,s)
+```
+ex8-0.stan
+```
+data{
+  int N;
+  vector[N] x;
+  vector[N] y;
+  int N1;
+  vector[N1] x1;
+}
+parameters{
+  real b0;
+  real b1;
+  real<lower=0> s;
+}
+model{
+  y~normal(b0+b1*x,s);
+}
+generated quantities{
+  vector[N] m0;
+  vector[N] y0;
+  for(i in 1:N){
+    m0[i]=b0+b1*x[i];
+    y0[i]=normal_rng(m0[i],s);
+  }
+  vector[N1] m1;
+  vector[N1] y1;
+  for(i in 1:N1){
+    m1[i]=b0+b1*x1[i];
+    y1[i]=normal_rng(m1[i],s);
+  }
+}
+```
+
+
+```{r}
+mdl=cmdstan_model('./ex8-0.stan') 
+data=list(N=n,x=x,y=y,N1=n1,x1=x1)
+fn(mdl,data)
+```
+
+
+```
+estimate as independent class  
+all b0l,b1l do not have a distribution  
+class c=1~k 
+yc~N(b0c+b1c*x,s)  
+```
+ex12-1.stan
+```
+data{
+  int N;
+  int K;
+  vector[N] x;
+  vector[N] y;
+  array[N] int c;
+}
+parameters{
+  vector[K] b0;
+  vector[K] b1;
+  real<lower=0> s;
+}
+model{
+  for(i in 1:N)
+    y[i]~normal(b0[c[i]]+b1[c[i]]*x[i],s);
+}
+generated quantities{
+  vector[N] m0;
+  vector[N] y0;
+  for(i in 1:N){
+    m0[i]=b0[c[i]]+b1[c[i]]*x[i];
+    y0[i]=normal_rng(m0[i],s);
+  }
+}
+```
+
+
+```{r}
+mdl=cmdstan_model('./ex12-1.stan') 
+data=list(N=n,K=k,x=x,y=y,c=factor(c))
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+seeMCMC(mcmc,'m')
+
+m0=mcmc$draws('m0')
+smm0=summary(m0)
+
+y0=mcmc$draws('y0')
+smy0=summary(y0)
+
+grid.arrange(
+  qplot(y,smy0$median,xlab='obs.',ylab='prd.')+geom_abline(intercept=0,slope=1))
+
+par(mfrow=c(1,2))
+hist(y-smy0$median,xlab='obs.-prd.',main='residual')
+density(y-smy0$median) |> plot(xlab='obs.-prd.',main='residual')
+
+
+xy=tibble(x=x,c=c,m=smm0$median,ml5=smm0$q5,mu5=smm0$q95,yl5=smy0$q5,yu5=smy0$q95)
+
+qplot(x,y,shape=c,size=I(2),col=I('red'))+
+  scale_shape_manual(values=1:k) + 
+  #geom_line(aes(x=x,y=ml5),xy,col='darkgray')+
+  #geom_line(aes(x=x,y=mu5),xy,col='darkgray')+
+  #geom_line(aes(x=x,y=yl5),xy,col='lightgray')+
+  #geom_line(aes(x=x,y=yu5),xy,col='lightgray')+
+  geom_line(aes(x=x,y=m),xy,col='black')
+
+
+qplot(x,y,facets=~c,size=I(2),col=I('red'))+
+  geom_line(aes(x=x,y=ml5),xy,col='darkgray')+
+  geom_line(aes(x=x,y=mu5),xy,col='darkgray')+
+  geom_line(aes(x=x,y=yl5),xy,col='lightgray')+
+  geom_line(aes(x=x,y=yu5),xy,col='lightgray')+
+  geom_line(aes(x=x,y=m),xy,col='black')
+```
+
+
+```
+estimate as class have relation each other  
+all b0l,b1l have a distribution  
+class c=1~k 
+b0c~N(b00,sb0)  
+b1c~N(b10,sb1)  
+yc~N(b0c+b1c*x,s)
+```
+ex12-2.stan
+```
+data{
+  int N;
+  int K;
+  vector[N] x;
+  vector[N] y;
+  array[N] int c;
+}
+parameters{
+  real b00;
+  real<lower=0,upper=100> sb0;
+  vector[K] b0;
+  real b10;
+  real<lower=0,upper=100> sb1;
+  vector[K] b1;
+  real<lower=0,upper=100> s;
+}
+model{
+  b0~normal(b00,sb0);
+  b1~normal(b10,sb1);
+  for(i in 1:N)
+    y[i]~normal(b0[c[i]]+b1[c[i]]*x[i],s);
+}
+generated quantities{
+  vector[N] m0;
+  vector[N] y0;
+  for(i in 1:N){
+    m0[i]=b0[c[i]]+b1[c[i]]*x[i];
+    y0[i]=normal_rng(m0[i],s);
+  }
+}
+```
+
+
+```{r}
+mdl=cmdstan_model('./ex12-2.stan') 
+data=list(N=n,K=k,x=x,y=y,c=factor(c))
+
+mle=mdl$optimize(data=data)
+try(print(mle))
+
+
+mcmc=goMCMC(mdl,data,wrm=1000,smp=2000)
+seeMCMC(mcmc,'m')
+
+m0=mcmc$draws('m0')
+smm0=summary(m0)
+
+y0=mcmc$draws('y0')
+smy0=summary(y0)
+
+grid.arrange(
+  qplot(y,smy0$median,xlab='obs.',ylab='prd.')+geom_abline(intercept=0,slope=1))
+
+par(mfrow=c(1,2))
+hist(y-smy0$median,xlab='obs.-prd.',main='residual')
+density(y-smy0$median) |> plot(xlab='obs.-prd.',main='residual')
+
+
+xy=tibble(x=x,c=c,m=smm0$median,ml5=smm0$q5,mu5=smm0$q95,yl5=smy0$q5,yu5=smy0$q95)
+
+qplot(x,y,shape=c,size=I(2),col=I('red'))+
+  scale_shape_manual(values=1:k) + 
+  #geom_line(aes(x=x,y=ml5),xy,col='darkgray')+
+  #geom_line(aes(x=x,y=mu5),xy,col='darkgray')+
+  #geom_line(aes(x=x,y=yl5),xy,col='lightgray')+
+  #geom_line(aes(x=x,y=yu5),xy,col='lightgray')+
+  geom_line(aes(x=x,y=m),xy,col='black')
+
+
+qplot(x,y,facets=~c,size=I(2),col=I('red'))+
+  geom_line(aes(x=x,y=ml5),xy,col='darkgray')+
+  geom_line(aes(x=x,y=mu5),xy,col='darkgray')+
+  geom_line(aes(x=x,y=yl5),xy,col='lightgray')+
+  geom_line(aes(x=x,y=yu5),xy,col='lightgray')+
+  geom_line(aes(x=x,y=m),xy,col='black')
+```
+
+
+
+ex13
+```
+generalized linear mixed model
+
+(X,y)i=1-n
+b[b0,b1,...]
+linear model    y~N(Xb,s)  
+generalized linear model    y~dist.(m=link(Xb),s)  
+
+fixed effect    b0, b1,...  
+individual random effect   b0+r0i r0~N(0,sr0), b1+r1i r1~N(0,sr1),...  
+class c=1-k  
+class effect    b0+r0c r0~N(0,sr0), b1+r1c r1~N(0,sr1),...  
+
+for y=dist.(m,s)
+random intercept model    m=b0+r0i+b1*x, m=b0+r0c+b1*x  
+random coefficient model  m=b0+(b1+r1i)*x, m=b0+(b1+r1c)*x  
+mixed model   m=b0+r0i+(b1+r1i)*x, m=b0+r0c+(b1+r1c)*x  
+
+note  
+@ yi=b0+b1*xi+r0i is not useful, ri is included in s  
+@ yi=b0+b1*xi+r0c is useful, repeated observation can be treated by class effect
+@ when appling Poisson dist.(y is larger than 0, error is larger at large x),
+  but variance is larger than mean (over dispersion),
+  random intercept model is useful
+```
+
+```{r}
+n=20
+x=runif(n,0,10)
+r0=rnorm(n,0,1)
+y=rpois(n,exp(2+0.1*x+r0))
+qplot(x,y)
+
+```
+
+ex13-0.stan
+```
+data{
+  int N;
+  vector[N] x;
+  array[N] int y;
+}
+parameters{
+  real b0;
+  real b1;
+}
+model{
+  y~poisson_log(b0+b1*x);
+}
+generated quantities{
+  vector[N] m0;
+  array[N] int y0;
+  for(i in 1:N){
+    m0[i]=b0+b1*x[i];
+    y0[i]=poisson_log_rng(m0[i]);
+  }
+}
+```
+
+
+```{r}
+mdl=cmdstan_model('./ex13-0.stan') 
+data=list(N=n,x=x,y=y)
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+seeMCMC(mcmc,'m')
+
+m0=mcmc$draws('m0')
+smm0=summary(m0)
+
+y0=mcmc$draws('y0')
+smy0=summary(y0)
+
+grid.arrange(
+  qplot(y,smy0$median,xlab='obs.',ylab='prd.')+geom_abline(intercept=0,slope=1))
+
+par(mfrow=c(1,2))
+hist(y-smy0$median,xlab='obs.-prd.',main='residual')
+density(y-smy0$median) |> plot(xlab='obs.-prd.',main='residual')
+
+
+xy=tibble(x=x,m=smm0$median,ml5=smm0$q5,mu5=smm0$q95,yl5=smy0$q5,yu5=smy0$q95)
+
+qplot(x,y,size=I(2),col=I('red'))+
+  scale_shape_manual(values=1:k) + 
+  geom_line(aes(x=x,y=exp(ml5)),xy,col='darkgray')+
+  geom_line(aes(x=x,y=exp(mu5)),xy,col='darkgray')+
+  geom_line(aes(x=x,y=yl5),xy,col='lightgray')+
+  geom_line(aes(x=x,y=yu5),xy,col='lightgray')+
+  geom_line(aes(x=x,y=exp(m)),xy,col='black')
+```
+
+
+ex13-1.stan
+```
+data{
+  int N;
+  vector[N] x;
+  array[N] int y;
+}
+parameters{
+  real b0;
+  real b1;
+  real<lower=0> sr0;
+  vector[N] r0;
+}
+model{
+  r0~normal(0,sr0);
+  for(i in 1:N)
+    y~poisson_log(b0+r0[i]+b1*x);
+}
+generated quantities{
+  vector[N] m0;
+  array[N] int y0;
+  for(i in 1:N){
+    m0[i]=b0+r0[i]+b1*x[i];
+    y0[i]=poisson_log_rng(m0[i]);
+  }
+}
+```
+
+
+```{r}
+mdl=cmdstan_model('./ex13-1.stan') 
+data=list(N=n,x=x,y=y)
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data,wrm=500)
+seeMCMC(mcmc,'[m,r]')
+
+m0=mcmc$draws('m0')
+smm0=summary(m0)
+
+y0=mcmc$draws('y0')
+smy0=summary(y0)
+
+grid.arrange(
+  qplot(y,smy0$median,xlab='obs.',ylab='prd.')+geom_abline(intercept=0,slope=1))
+
+par(mfrow=c(1,2))
+hist(y-smy0$median,xlab='obs.-prd.',main='residual')
+density(y-smy0$median) |> plot(xlab='obs.-prd.',main='residual')
+
+
+xy=tibble(x=x,m=smm0$median,ml5=smm0$q5,mu5=smm0$q95,yl5=smy0$q5,yu5=smy0$q95)
+
+qplot(x,y,size=I(2),col=I('red'))+
+  scale_shape_manual(values=1:k) + 
+  geom_line(aes(x=x,y=exp(ml5)),xy,col='darkgray')+
+  geom_line(aes(x=x,y=exp(mu5)),xy,col='darkgray')+
+  geom_line(aes(x=x,y=yl5),xy,col='lightgray')+
+  geom_line(aes(x=x,y=yu5),xy,col='lightgray')+
+  geom_line(aes(x=x,y=exp(m)),xy,col='black')
+
+```
+

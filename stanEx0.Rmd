@@ -1,0 +1,533 @@
+---
+title: "stanEx0"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=T,warning=F,message=F)
+suppressWarnings(
+  suppressMessages(
+    suppressPackageStartupMessages({
+      library(stats)
+      library(MASS)
+      library(tidyverse)
+    })
+  )
+)
+options(scipen=100,digits=3)
+library(cmdstanr)
+options(mc.cores=parallel::detectCores())
+options(cmdstanr_max_rows=1000)
+library(gridExtra)
+```
+
+```
+use stan
+
+
+install.packages('cmdstanr',repos=c('https://mc-stan.org/r-packages/',getOption('repos')))
+
+library(cmdstanr)
+check_cmdstan_toolchain(fix=T)
+install_cmdstan(cores=2)
+cmdstan_version()
+
+
+resttart R
+
+
+options(mc.cores=parallel::detectCores())
+
+
+make stan file '---.stan'
+```
+
+ex0-0.stan
+```
+data{
+  int N;
+  array[N] int y;
+}
+parameters{
+  real<lower=0,upper=1> p;
+}
+model{
+  p~beta(1,1);
+  y~bernoulli(p);
+}
+```
+
+
+execute mcmc sampling
+```{r}
+goMCMC=function(mdl,data,smp=500,wrm=100,th=1){
+  mcmc=mdl$sample(
+  data=data,
+  seed=1,
+  chains=4,
+  iter_sampling=smp,
+  iter_warmup=wrm,
+  thin=th,
+  refresh=1000
+  )
+  mcmc
+}
+```
+
+
+```{r}
+mdl=cmdstan_model('./ex0-0.stan')
+#mdl$exe_file()
+
+data=list(N=9,y=sample(0:1,9,replace=T))
+
+mle=mdl$optimize(data=data)
+mle
+
+
+mcmc=mdl$sample(
+  data=data,
+  #seed=1,
+  #chains=4,
+  iter_sampling=500,
+  iter_warmup=100,
+  #thin=1,
+  refresh=1000
+)
+# or
+#mcmc=goMCMC(mdl,data)
+
+mcmc
+#or
+#mcmc$summary()
+
+
+drw=mcmc$draws('p')
+
+par(mfrow=c(1,4))
+drw[,1,] |> plot(type='l',main='chain1',ylab='p')
+drw[,2,] |> plot(type='l',main='chain2',ylab='p')
+drw[,3,] |> plot(type='l',main='chain3',ylab='p')
+drw[,4,] |> plot(type='l',main='chain4',ylab='p')
+
+par(mfrow=c(1,2))
+drw %>% hist()
+drw %>% density() %>% plot()
+```
+
+
+see mcmc result and parameters
+```{r}
+seeMCMC=function(mcmc,exc='',ch=T){ # exclude 'exc' parameters from seeing
+  print(mcmc)
+  prs=mcmc$metadata()$model_params[-1] # reject lp__
+  for(pr in prs){
+    if(grepl('^y',pr)) next # not show predictive value "y*" information
+    if(exc!='' && grepl(paste0('^',exc),pr)) next
+    drw=mcmc$draws(pr)
+    if(ch){
+      par(mfrow=c(1,4))
+      drw[,1,] |> plot(type='l',main='chain1',ylab=pr)
+      drw[,2,] |> plot(type='l',main='chain2',ylab=pr)
+      drw[,3,] |> plot(type='l',main='chain3',ylab=pr)
+      drw[,4,] |> plot(type='l',main='chain4',ylab=pr)
+    }
+
+    par(mfrow=c(1,2))
+    drw |> hist(main=pr,xlab='')
+    drw |> density() |> plot(main=pr)    
+  }
+}
+```
+
+
+```{r}
+mcmc$metadata()$stan_variables
+mcmc$metadata()$model_params
+
+seeMCMC(mcmc)
+```
+
+
+save and load mdl,mcmc result
+```{r}
+saveRDS(mdl,'bin_mdl.rds')
+saveRDS(mcmc,'bin_mcmc.rds')
+
+mdl=readRDS('bin_mdl.rds')
+mcmc=readRDS('bin_mcmc.rds')
+
+library(qs)
+qsave(mcmc,'bin_mcmc.qs')
+mcmc=qread('bin_mcmc.qs')
+```
+
+
+
+use formula and design matrix
+```{r}
+n=30
+tb=tibble(x=runif(n,0,9),y=rnorm(n,x,1))
+tb
+f0=formula('y~x')
+f0
+lm(f0,tb)
+
+X=model.matrix(f0,tb) # get explanatory variables from what in formula
+X
+
+tb=tibble(x1=runif(n,0,9),
+          x2=runif(n,0,9),
+          c1=sample(c('a','b','c'),n,replace=T),
+          y=rnorm(n,x1-x2+(c1=='b')*5-(c1=='c')*5,1))
+tb
+f0=formula('y~x1')
+f0
+lm(f0,tb)
+
+model.matrix(f0,tb)
+
+f1=formula('y~x1+x2')
+f1
+lm(f1,tb)
+
+model.matrix(f1,tb) # get explanatory variables from what in formula
+
+f2=formula('y~x1+x2+c1')
+f2
+lm(f2,tb)
+
+model.matrix(f2,tb) # make categorical variable to dummy variable
+```
+
+
+use brms
+```{r}
+library(brms)
+
+rst=brm(f2,
+        data=tb,
+        family=gaussian('identity'), # binomial('logit'),poisson('log')
+        #seed=1,
+        #chains=4,
+        iter=500,
+        warmup=100,
+        #thin=1,
+        prior=c(set_prior('',class='Intercept'),
+                set_prior('',class='sigma'))
+        )
+
+rst
+stancode(rst)
+standata(rst)
+plot(rst) #mcmc trace plot
+mcmc=as.mcmc(rst,combine_chains=T) #mcmc sampling
+
+x_new=tibble(x1=runif(3,0,9),x2=runif(3,0,9),c1=c('a','b','c'))
+x_new
+
+# bayes credible interval
+fitted(rst,x_new)
+marginal_effects(rst,effects='x1') |> plot(points=T)
+marginal_effects(rst,effects='x2') |> plot(points=T)
+marginal_effects(rst,effects='x1:c1') |> plot(points=T)
+marginal_effects(rst,effects='x2:c1') |> plot(points=T)
+
+
+# bayes predicted interval
+predict(rst,x_new)
+marginal_effects(rst,effects='x1',method='predict') |> plot(points=T)
+marginal_effects(rst,effects='x2',method='predict') |> plot(points=T)
+marginal_effects(rst,effects='x1:c1',method='predict') |> plot(points=T)
+marginal_effects(rst,effects='x2:c1',method='predict') |> plot(points=T)
+```
+
+
+stan syntax
+```
+code block
+  add semicolon ";" at the end of sentence
+
+  data{
+    define objects from R as list
+  }
+  parameters{
+    define estimating parameters from MCMC, can't use int type
+  }
+  transformed parameters{
+    define caluculating parameters from other parameters
+  }
+  model{
+    caluculate log liklihood
+    define stochastic model, ex. y~normal(m,s) or target+=dist._lpdf(y|m,s)
+  }
+  generated quantities{
+    define caluculating quantities from parameters
+  }
+
+
+object type and its difinition of single and array
+
+  variable
+    integer int x, array[N] int x, array[N,M] int x
+    real    real x, array[N] real x, array[N,M] real x
+      for array[N] int/real x
+        x[i]      $x_i$
+        x[i1:i2]  array $(x_{i1}...x_{i2})$
+      for array[N,M] int/real x
+        x[i,j]    $x_{ij}$
+        x[i]      array $(x_{i1}...x_{iM})$  
+  
+  vector
+    vector[K] x, array[N] vector[K] x
+      for vector[K] x
+        x[i]      $x_i$
+        x[i1:i2]  vector $(x_{i1}...x_{i2})$
+      for array[N] vector[K] x
+        x[i,k]    $x_{ik}$
+        x[i]      vector[k] x[i]
+  
+    row_vector[K] x, array[N] row_vector[K] x
+    simplex[K] x        $x_i[0,1], \Sigma x_i=1$
+    unit_vector[K] x    $\Sigma x_i^2=1$
+    ordered[K] x        $x_1 < x_2 ... < x_K$
+  
+  matrix
+    matrix[J,K] x, array[N] matrix[J,k] x
+    cov_matrix[K] x     symmetric, all eigen>=0
+    corr_matrix[K] x    symmetric, all eigen>=0, $x_{ij}[0,1], x_{ii}=1$
+      for matrix[J,K] x
+        x[j,k]    $x_{jk}$
+        x[j,]     row_vector[K] $x_j$
+        x[,k]     vector[J] $x_k$
+        x[j1:j2,k1:k2]  matrix[j2-j1+1,k2-k1+1]
+      for array[N] matrix[J,K] x
+        x[i]      matrix[J,K] $x_i$
+
+    to fasten a loop for doing matrix[J,K] x
+        for(k in 1:K){
+          for(j in 1:J){
+            do x[j,k]
+          }
+        }
+
+
+parameter constraint
+
+  real<lower=0,upper=1> x;
+  real<lower=l,upper=u> x;
+  
+  real a[N];
+  real<lower=min(a),upper=max(a)> x;
+  
+  vector<lower=0,upper=1>[K] x;
+
+using simplex
+  categorical distribution
+    y~Cat(h)  
+      i=1~n, k=1~K, $y_i[1,K], h_k[0,1], \Sigma h_k=1$
+      $P[y=k]=h_k$
+
+  data{
+    int N;
+    int K;
+    array[N] int<lower=1,upper=K> y; // R y[n],yi[1:K]
+  }
+  parameters{
+    simplex[K] h;
+  }
+  model{
+    for(i in 1:N){
+      y[i]~categorical(h);
+    }
+  }
+
+  multinomial distribution
+    y~multi(n,h)
+      i=1~n, k=1~K, $c_i[1:K], y_k=#(c_i=k), y_k[0,n]$  
+      $h_k[0,1], \Sigma h_k=1$  
+      $P[c=k]=h_k$  
+
+  data{
+    int K;
+    array[K] int<lower=0> y; // R y=table(factor(c,levels=1:K))
+  }
+  parameters{
+    simplex[K] h;
+  }
+  model{
+    y~multinomial(h);
+  }
+
+
+use vector, matrix instead of array to be fast
+
+  using array
+    data{
+      int N;
+      array[N] real x;
+      array[N] real y;
+    }
+    parameters{
+      real<lower=0> s;
+    }
+    transformed parameters{
+      array[N] real m;
+      for(i in 1:N){
+        m[i]= ; // caluculation of x[i]
+      }
+    }
+    model{
+      for(i in 1:N){
+        y[i]~normal(m[i],s);
+    }
+
+  using vector
+    data{
+      int N;
+      vector[N] x;
+      vector[N] y;
+    }
+    parameters{
+      real<lower=0> s;
+    }
+    transformed parameters{
+      vector[N] m;
+      m= ; //caluculation of x
+    }
+    model{
+      y~normal(m,s);
+        or
+      target+=normal_lpdf(y|m,s)
+    }
+
+
+mixed model
+  data{
+    int N;
+    int K;
+    array[N] int<lower=1,upper=K> ID;
+    vector[N] x;
+    vector[N] y;
+  }
+  parameters{
+    real a0;
+    real b0;
+    vector[K] a;
+    vector[K] b;
+    real<lower=0> sa;
+    real<lower=0> sb;
+    real<lower=0> s;
+  }
+  model{
+    a~normal(a0,sa);
+    b~normal(b0,sb);
+    y~normal(a[ID]+b[ID].*x,s); // .* is multiply element by element
+  }
+
+
+K dimension multi normal distribution
+  data{
+    int N;
+    int K;
+    arrat[N] vector[K] y;
+  }
+  parameters{
+    vector[K] m;
+    cov_matrix[K] cov;
+  }
+  model{
+    y~multi_normal(m,cov);
+  }
+
+
+multi regression
+  data{
+    int N;
+    int K;
+    matrix[N,K] x; // model.matrix x from R 
+    vector[N] y;
+  }
+  parameters{
+    vector[k] b;
+    real<lower=0> s;
+  }
+  transformed parameters{
+    vector[k] m;
+    m=x*b;
+  }
+  model{
+    y~normal(m,s);
+  }
+```
+
+
+ex0-1.stan
+```
+data{
+  int N;
+  int K;
+  int<lower=1,upper=K> y[N]; // R y[n],yi[1:K]
+}
+parameters{
+  simplex[K] h;
+}
+model{
+  for(i in 1:N){
+    y[i]~categorical(h);
+  }
+}
+```
+
+```{r}
+c0=c(1,2,3,4)
+h=c(0.4,0.3,0.2,0.1)
+y=sample(c0,20,h,replace=T)
+table(y) |> prop.table()
+
+mdl=cmdstan_model('./ex0-1.stan')
+data=list(N=length(y),K=length(c0),y=y)
+
+mle=mdl$optimize(data=data)
+mle
+
+system.time({
+  mcmc=goMCMC(mdl,data)
+  seeMCMC(mcmc,ch=F)
+})
+```
+
+
+ex0-2.stan
+```
+data{
+  int K;
+  array[K] int<lower=0> y; // R y=table(factor(c,levels=1:K))
+}
+parameters{
+  simplex[K] h;
+}
+model{
+  y~multinomial(h);
+}
+```
+
+```{r}
+c0=c(1,2,3,4)
+h=c(0.4,0.3,0.2,0.1)
+c=sample(c0,20,h,replace=T)
+table(c) |> prop.table()
+y=table(factor(c,levels=1:length(c0)))
+
+mdl=cmdstan_model('./ex0-2.stan')
+data=list(K=length(c0),y=y)
+
+mle=mdl$optimize(data=data)
+mle
+
+system.time({
+  mcmc=goMCMC(mdl,data)
+  seeMCMC(mcmc,ch=F)
+})
+```
+

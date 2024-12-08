@@ -1,0 +1,462 @@
+---
+title: "stanEx3"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=T,warning=F,message=F)
+suppressWarnings(
+  suppressMessages(
+    suppressPackageStartupMessages({
+      library(stats)
+      library(MASS)
+      library(tidyverse)
+    })
+  )
+)
+options(scipen=100,digits=3)
+library(cmdstanr)
+options(mc.cores=parallel::detectCores())
+options(cmdstanr_max_rows=1000)
+library(gridExtra)
+```
+
+
+
+```{r}
+fn=function(mdl,data,smp=500,wrm=100){
+mle=mdl$optimize(data=data)
+print(mle)
+
+mcmc=goMCMC(mdl,data,smp,wrm)
+
+mcmc$metadata()$stan_variables
+seeMCMC(mcmc,'m')
+
+
+y0=mcmc$draws('y0')
+smy0=summary(y0)
+
+grid.arrange(
+  qplot(y,smy0$median,xlab='obs.',ylab='prd.')+geom_abline(intercept=0,slope=1))
+
+par(mfrow=c(1,2))
+hist(y-smy0$median,xlab='obs.-prd.',main='residual')
+density(y-smy0$median) |> plot(xlab='obs.-prd.',main='residual')
+
+
+m1=mcmc$draws('m1')
+smm1=summary(m1)
+y1=mcmc$draws('y1')
+smy1=summary(y1)
+
+xy=tibble(x=x1,m=smm1$median,ml5=smm1$q5,mu5=smm1$q95,yl5=smy1$q5,yu5=smy1$q95)
+
+qplot(x,y,col=I('red'))+
+  geom_line(aes(x=x,y=ml5),xy,col='darkgray')+
+  geom_line(aes(x=x,y=mu5),xy,col='darkgray')+
+  geom_line(aes(x=x,y=yl5),xy,col='lightgray')+
+  geom_line(aes(x=x,y=yu5),xy,col='lightgray')+
+  geom_line(aes(x=x,y=m),xy,col='black')
+}
+```
+
+
+ex9
+```
+explanatory variable obs.x also has noise  
+x~N(x0.sx)  
+y~N(b0+b1*x0,s)  
+```
+
+ex8-0.stan
+```
+data{
+  int N;
+  vector[N] x;
+  vector[N] y;
+  int N1;
+  vector[N1] x1;
+}
+parameters{
+  real b0;
+  real b1;
+  real<lower=0> s;
+}
+model{
+  y~normal(b0+b1*x,s);
+}
+generated quantities{
+  vector[N] m0;
+  vector[N] y0;
+  for(i in 1:N){
+    m0[i]=b0+b1*x[i];
+    y0[i]=normal_rng(m0[i],s);
+  }
+  vector[N1] m1;
+  vector[N1] y1;
+  for(i in 1:N1){
+    m1[i]=b0+b1*x1[i];
+    y1[i]=normal_rng(m1[i],s);
+  }
+}
+```
+
+
+ex9.stan
+```
+data{
+  int N;
+  vector[N] x;
+  vector[N] y;
+  int N1;
+  vector[N1] x10;
+}
+parameters{
+  real b0;
+  real b1;
+  real<lower=0> s;
+  real<lower=0> sx;
+  vector[N] x0;
+}  
+model{
+  for(i in 1:N){
+    x[i]~normal(x0[i],sx);
+    y[i]~normal(b0+b1*x0[i],s);
+  }
+}
+generated quantities{
+  vector[N] m0;
+  vector[N] y0;
+  for(i in 1:N){
+    m0[i]=b0+b1*x0[i];
+    y0[i]=normal_rng(m0[i],s);
+  }
+  vector[N1] m1;
+  vector[N1] x1;
+  vector[N1] y1;
+  for(i in 1:N1){
+    x1[i]=normal_rng(x10[i],sx);
+    m1[i]=b0+b1*x10[i];
+    y1[i]=normal_rng(m1[i],s);
+  }
+}
+```
+
+
+```{r}
+n=20
+x0=runif(n,0,20)
+x=rnorm(n,x0,2)
+y=rnorm(n,x0*2+5,2)
+qplot(x,y)
+n1=10
+
+#explanatory variable do not has noise
+x1=seq(min(x),max(x),length.out=n1) # new data fpr predcition
+data=list(N=n,x=x,y=y,N1=n1,x1=x1)
+
+mdl=cmdstan_model('./ex8-0.stan') 
+fn(mdl,data)
+
+
+#explanatory variable has noise
+x10=seq(min(x),max(x),length.out=n1) # new data fpr predcition
+data=list(N=n,x=x,y=y,N1=n1,x10=x10)
+
+mdl=cmdstan_model('./ex9.stan')
+mcmc=goMCMC(mdl,data,wrm=500,smp=1000)
+
+seeMCMC(mcmc,'[m,x]')
+
+y0=mcmc$draws('y0')
+smy0=summary(y0)
+
+grid.arrange(
+  qplot(y,smy0$median,xlab='obs.',ylab='prd.')+geom_abline(intercept=0,slope=1))
+
+par(mfrow=c(1,2))
+hist(y-smy0$median,xlab='obs.-prd.',main='residual')
+density(y-smy0$median) |> plot(xlab='obs.-prd.',main='residual')
+
+
+m1=mcmc$draws('m1')
+smm1=summary(m1)
+x1=mcmc$draws('x1')
+smx1=summary(x1)
+y1=mcmc$draws('y1')
+smy1=summary(y1)
+
+xy=tibble(x=smx1$median,m=smm1$median,ml5=smm1$q5,mu5=smm1$q95,yl5=smy1$q5,yu5=smy1$q95)
+
+qplot(x,y,col=I('red'))+
+  geom_line(aes(x=x,y=ml5),xy,col='darkgray')+
+  geom_line(aes(x=x,y=mu5),xy,col='darkgray')+
+  geom_line(aes(x=x,y=yl5),xy,col='lightgray')+
+  geom_line(aes(x=x,y=yu5),xy,col='lightgray')+
+  geom_line(aes(x=x,y=m),xy,col='black')
+```
+
+
+
+ex10
+```
+outlier
+y~cauchy(b0+b1*x,s)
+```
+ex10.stan
+```
+data{
+  int N;
+  vector[N] x;
+  vector[N] y;
+  int N1;
+  vector[N1] x1;
+}
+parameters{
+  real b0;
+  real b1;
+  real<lower=0> s;
+}
+model{
+  y~cauchy(b0+b1*x,s);
+}
+generated quantities{
+  vector[N] m0;
+  vector[N] y0;
+  for(i in 1:N){
+    m0[i]=b0+b1*x[i];
+    y0[i]=cauchy_rng(m0[i],s);
+  }
+  vector[N1] m1;
+  vector[N1] y1;
+  for(i in 1:N1){
+    m1[i]=b0+b1*x1[i];
+    y1[i]=cauchy_rng(m1[i],s);
+  }
+}
+```
+
+
+```{r}
+n=20
+x=runif(n,0,9)
+y=rnorm(n,x*2+5,1)
+x[1]=3
+y[1]=25
+qplot(x,y)
+n1=10
+
+x1=seq(min(x),max(x),length.out=n1) # new data fpr predcition
+data=list(N=n,x=x,y=y,N1=n1,x1=x1)
+
+mdl=cmdstan_model('./ex8-0.stan') 
+fn(mdl,data)
+
+mdl=cmdstan_model('./ex10.stan') 
+fn(mdl,data)
+```
+
+
+
+ex11
+```
+censored  
+
+y i=1-N, y~N(m,s)  
+  acutualy        ya i=1-Na
+  lower censored  yl i=1-Nl, y<L, P(y<L)=cdf(L-m /s)
+  upper censored  yu i=1-Nu, y>U, P(y>U)=ccdf(U-m /s)
+
+cdf(z) cumulative normal density function, P((-Infinity,z],z~N(0,1))
+ccdf(z) complementary CDF, P([z,Infinity),z~N(0,1))
+
+P(y | x,m,s)=P(ya i=1-Na)* P(yl i=1-Nl)* P(yu i=1-Nu)
+```
+ex11.stan
+```
+data{
+  int N;
+  vector[N] x;
+  vector[N] y;
+  real L;
+  int Nl;
+  vector[Nl] xl;
+  real U;
+  int Nu;
+  vector[Nu] xu;
+  int N1;
+  vector[N1] x1;
+}
+parameters{
+  real b0;
+  real b1;
+  real<lower=0> s;
+}
+model{
+  y~normal(b0+b1*x,s);
+  for(i in 1:Nl)
+    target+=normal_lcdf(L | b0+b1*xl[i],s);
+  for(i in 1:Nu)
+    target+=normal_lccdf(U | b0+b1*xu[i],s);
+}
+generated quantities{
+  vector[N] m0;
+  vector[N] y0;
+  for(i in 1:N){
+    m0[i]=b0+b1*x[i];
+    y0[i]=normal_rng(m0[i],s);
+  }
+  vector[N1] m1;
+  vector[N1] y1;
+  for(i in 1:N1){
+    m1[i]=b0+b1*x1[i];
+    y1[i]=normal_rng(m1[i],s);
+  }
+}
+```
+
+
+```{r}
+n0=20
+x=runif(n0,0,9)
+y=rnorm(n0,10+3*x,4)
+L=15
+y[y<L]=L
+nl=sum(y==L)
+U=30
+y[y>U]=U
+nu=sum(y==U)
+n=n0-nl-nu
+qplot(x,y)
+
+xy0=tibble(x=x,y=y)
+xya=filter(xy0, y>L & y<U)
+xyl=filter(xy0, y==L)
+xyu=filter(xy0, y==U)
+
+n1=10
+x1=seq(min(x),max(x),length.out=n1) # new data fpr predcition
+```
+
+
+```{r}
+data=list(N=n,x=xya$x,y=xya$y,N1=n1,x1=x1)
+mdl=cmdstan_model('./ex8-0.stan') 
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+seeMCMC(mcmc,'m')
+
+y0=mcmc$draws('y0')
+smy0=summary(y0)
+
+grid.arrange(
+  qplot(xya$y,smy0$median,xlab='obs.',ylab='prd.')+geom_abline(intercept=0,slope=1))
+
+par(mfrow=c(1,2))
+hist(xya$y-smy0$median,xlab='obs.-prd.',main='residual')
+density(xya$y-smy0$median) |> plot(xlab='obs.-prd.',main='residual')
+
+m1=mcmc$draws('m1')
+smm1=summary(m1)
+y1=mcmc$draws('y1')
+smy1=summary(y1)
+
+xy=tibble(x=x1,m=smm1$median,ml5=smm1$q5,mu5=smm1$q95,yl5=smy1$q5,yu5=smy1$q95)
+
+qplot(x,y,col=I('red'))+
+  geom_line(aes(x=x,y=ml5),xy,col='darkgray')+
+  geom_line(aes(x=x,y=mu5),xy,col='darkgray')+
+  geom_line(aes(x=x,y=yl5),xy,col='lightgray')+
+  geom_line(aes(x=x,y=yu5),xy,col='lightgray')+
+  geom_line(aes(x=x,y=m),xy,col='black')
+```
+
+
+```{r}
+data=list(N=n,x=xya$x,y=xya$y,
+          L=L,Nl=nl,xl=xyl$x,
+          U=U,Nu=nu,xu=xyu$x,
+          N1=n1,x1=x1)
+mdl=cmdstan_model('./ex11.stan') 
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+seeMCMC(mcmc,'m',ch=T)
+
+y0=mcmc$draws('y0')
+smy0=summary(y0)
+
+grid.arrange(
+  qplot(xya$y,smy0$median,xlab='obs.',ylab='prd.')+geom_abline(intercept=0,slope=1))
+
+par(mfrow=c(1,2))
+hist(xya$y-smy0$median,xlab='obs.-prd.',main='residual')
+density(xya$y-smy0$median) |> plot(xlab='obs.-prd.',main='residual')
+
+m1=mcmc$draws('m1')
+smm1=summary(m1)
+y1=mcmc$draws('y1')
+smy1=summary(y1)
+
+xy=tibble(x=x1,m=smm1$median,ml5=smm1$q5,mu5=smm1$q95,yl5=smy1$q5,yu5=smy1$q95)
+
+qplot(x,y,col=I('red'))+
+  geom_line(aes(x=x,y=ml5),xy,col='darkgray')+
+  geom_line(aes(x=x,y=mu5),xy,col='darkgray')+
+  geom_line(aes(x=x,y=yl5),xy,col='lightgray')+
+  geom_line(aes(x=x,y=yu5),xy,col='lightgray')+
+  geom_line(aes(x=x,y=m),xy,col='black')
+```
+
+
+
+```
+bimodal distribution
+mixed normal distribution
+```
+```
+data {
+  int<lower=0> N;               // データの数
+  real y[N];                    // 観測データ
+}
+parameters {
+  real<lower=0, upper=1> theta; // 分布1と分布2の混合比率
+  real mu1;                     // 分布1の平均
+  real mu2;                     // 分布2の平均
+  real<lower=0> sigma1;         // 分布1の標準偏差
+  real<lower=0> sigma2;         // 分布2の標準偏差
+}
+model {
+  for (n in 1:N) {
+    target += log_mix(theta,
+                      normal_lpdf(y[n] | mu1, sigma1),
+                      normal_lpdf(y[n] | mu2, sigma2));
+  }
+}
+```
+
+
+```{r}
+y0=rnorm(100,0,1)
+y1=rnorm(100,-5,1)
+y2=rnorm(100,5,1)
+y=sample(c(y0,y1,y2),100)
+density(y) |> plot()
+```
+
+EM algorithm
+```{r}
+library(mclust)
+
+rst=Mclust(y)
+summary(rst)
+rst$parameters
+plot(rst)
+```
+

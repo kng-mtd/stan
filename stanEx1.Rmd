@@ -1,0 +1,565 @@
+---
+title: "stanEx1"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=T,warning=F,message=F)
+suppressWarnings(
+  suppressMessages(
+    suppressPackageStartupMessages({
+      library(stats)
+      library(MASS)
+      library(tidyverse)
+    })
+  )
+)
+options(scipen=100,digits=3)
+library(cmdstanr)
+options(mc.cores=parallel::detectCores())
+options(cmdstanr_max_rows=1000)
+library(gridExtra)
+```
+
+
+ex1 normal distribution
+\
+ex1.stan
+```
+data{
+  int N;
+  vector[N] y;
+}
+
+parameters{
+  real m;
+  real<lower=0> s;
+}
+
+model{
+  y~normal(m,s);
+}
+```
+
+```{r}
+mdl=cmdstan_model('./ex1.stan')
+y=rnorm(10,2,1)
+summary(y)
+par(mfrow=c(1,2))
+hist(y,main='y')
+density(y) |> plot(main='y')  
+
+data=list(N=length(y),y=y)
+
+mle=mdl$optimize(data=data)
+mle
+
+
+mcmc=goMCMC(mdl,data)
+
+mcmc
+mcmc$metadata()$stan_variables
+mcmc$metadata()$model_params
+seeMCMC(mcmc)
+```
+
+
+ex2 poisson distribution
+
+
+ex2
+```{r}
+y=rpois(20,3)
+summary(y)
+par(mfrow=c(1,2))
+hist(y,main='y')
+density(y) |> plot(main='y')
+
+data=list(N=length(y),y=y)
+```
+
+ex2-1.stan
+```
+data{
+  int N;
+  vector[N] y;
+}
+
+parameters{
+  real<lower=0> m;
+  real<lower=0> s;
+}
+
+model{
+  y~normal(m,s);
+}
+
+generated quantities{
+  vector[N] y1;
+  for(i in 1:N)
+    y1[i]=normal_rng(m,s);
+}
+```
+
+```{r}
+# when fitting poisson dist. sample to normal dist.
+mdl=cmdstan_model('./ex2-1.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc)
+
+y1=mcmc$draws('y1')
+par(mfrow=c(1,2))
+hist(y1,main='y1')
+density(y1) |> plot(main='y1')     
+```
+
+ex2-2.stan
+```
+data{
+  int N;
+  array[N] int y;
+}
+
+parameters{
+  real<lower=0> l;
+}
+
+model{
+  y~poisson(l);
+}
+
+generated quantities{
+  array[N] int y1;
+  for(i in 1:N)
+    y1[i]=poisson_rng(l);
+}
+```
+
+
+```{r}
+mdl=cmdstan_model('./ex2-2.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc)
+
+y1=mcmc$draws('y1')
+par(mfrow=c(1,2))
+hist(y1,main='y1')
+density(y1) |> plot(main='y1') 
+```
+
+
+ex3  
+difference test
+
+ex3.stan
+```
+data{
+  int N;
+  vector[N] a;
+  vector[N] b;
+}
+parameters{
+  real ma;
+  real<lower=0> sa;
+  real mb;
+  real<lower=0> sb;
+}
+model{
+  a~normal(ma,sa);
+  b~normal(mb,sb);
+}
+generated quantities{
+  real d;
+  d=mb-ma;
+}
+```
+
+
+```{r}
+n=20
+a=rnorm(n,10,1)
+b=rnorm(n,11,2)
+data=list(N=n,a=a,b=b)
+
+mdl=cmdstan_model('./ex3.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc,ch=F)
+
+d=mcmc$draws('d')
+d
+mean(d>0)
+```
+
+
+ex4
+
+
+ex4-1.stan
+```
+data{
+  int N;
+  vector[N] x;
+  vector[N] y;
+}
+
+parameters{
+  real b0;
+  real b1;
+  real<lower=0> s;
+}
+
+model{
+  y~normal(b0+b1*x,s);
+}
+```
+
+
+```{r}
+# make prediction with R
+n=20
+x=runif(n,0,100)
+y=rnorm(n,x*3+10,10)
+par(mfrow=c(1,1))
+plot(x,y)
+
+data=list(N=n,x=x,y=y)
+
+mdl=cmdstan_model('./ex4-1.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc,ch=F)
+
+b0=mcmc$draws('b0')
+b1=mcmc$draws('b1')
+b=tibble(b0=c(b0),b1=c(b1)) |> sample_n(100)
+x1=runif(nrow(b),min(x),max(x))
+xy=tibble(x=x1,y=b$b0+b$b1*x1)
+par(mfrow=c(1,1))
+plot(xy)
+```
+
+
+ex4-2.stan
+```
+data{
+  int N;
+  vector[N] x;
+  vector[N] y;
+  int N1;
+  vector[N1] x1;
+}
+
+parameters{
+  real b0;
+  real b1;
+  real<lower=0> s;
+}
+
+model{
+  y~normal(b0+b1*x,s);
+}
+
+generated quantities{
+  vector[N1] m;
+  vector[N1] y1;
+  for(i in 1:N1){
+    m[i]=b0+b1*x1[i];
+    y1[i]=normal_rng(m[i],s);
+  }
+}
+```
+
+
+```{r}
+# make prediction with stan
+n1=10
+x1=seq(min(x),max(x),length.out=n1) # new data fpr predcition
+
+data=list(N=n,x=x,y=y,N1=n1,x1=x1)
+
+mdl=cmdstan_model('./ex4-2.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+mcmc$metadata()$stan_variables
+seeMCMC(mcmc,'m',ch=F)
+
+m=mcmc$draws('m')
+summary(m)
+smm=summary(m)
+
+y1=mcmc$draws('y1')
+summary(y1)
+smy=summary(y1)
+
+xy=tibble(x=x1,m=smm$median,ml5=smm$q5,mu5=smm$q95,yl5=smy$q5,yu5=smy$q95)
+
+par(mfrow=c(1,1))
+xlim=c(min(x),max(x))
+ylim=c(min(y),max(y))
+plot(x,y,
+     xlim=xlim,ylim=ylim, xlab='x',ylab='y',col='red')
+par(new=T)
+plot(xy$x,xy$m,type='l',
+     xlim=xlim,ylim=ylim, xlab='',ylab='',col='black')
+par(new=T)
+plot(xy$x,xy$ml5,type='l',
+     xlim=xlim,ylim=ylim, xlab='',ylab='',col='darkgray')
+par(new=T)
+plot(xy$x,xy$mu5,type='l',
+     xlim=xlim,ylim=ylim, xlab='',ylab='',col='darkgray')
+par(new=T)
+plot(xy$x,xy$yl5,type='l',
+     xlim=xlim,ylim=ylim, xlab='',ylab='',col='lightgray')
+par(new=T)
+plot(xy$x,xy$yu5,type='l',
+     xlim=xlim,ylim=ylim, xlab='',ylab='',col='lightgray')
+
+qplot(x,y,col=I('red'))+
+  geom_line(aes(x=x,y=m),xy,col='black')+
+  geom_line(aes(x=x,y=ml5),xy,col='darkgray')+
+  geom_line(aes(x=x,y=mu5),xy,col='darkgray')+
+  geom_line(aes(x=x,y=yl5),xy,col='lightgray')+
+  geom_line(aes(x=x,y=yu5),xy,col='lightgray')
+```
+
+
+ex4-3.stan
+```
+data{
+  int N;
+  vector[N] x;
+  vector[N] y;
+}
+
+parameters{
+  real b0;
+  real b1;
+  real<lower=0> s;
+}
+
+model{
+  y~normal(b0+b1*x,s);
+}
+
+generated quantities{
+  vector[N] m;
+  vector[N] y1;
+  for(i in 1:N){
+    m[i]=b0+b1*x[i];
+    y1[i]=normal_rng(m[i],s);
+  }
+}
+```
+
+
+```{r}
+data=list(N=n,x=x,y=y)
+
+mdl=cmdstan_model('./ex4-3.stan')
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc,'m',ch=F)
+
+y1=mcmc$draws('y1')
+smy=summary(y1)
+
+par(mfrow=c(1,1))
+plot(y,smy$median,xlab='obs.',ylab='prd.')
+abline(0,1)
+
+qplot(y,smy$median,xlab='obs.',ylab='prd.')+geom_abline(intercept=0,slope=1)
+
+par(mfrow=c(1,2))
+hist(y-smy$median,xlab='obs.-prd.',main='residual')
+density(y-smy$median) |> plot(xlab='obs.-prd.',main='residual')
+```
+
+
+
+estimate correlation
+ex4-41.stan
+```
+data{
+  int N;
+  array[N] vector[2] y;
+}
+
+parameters{
+  vector[2] m;
+  vector<lower=0>[2] s;
+  real<lower=-1,upper=1> r;
+}
+
+transformed parameters{
+  cov_matrix[2] cv;
+  cv[1,1]=s[1]^2;
+  cv[2,2]=s[2]^2;
+  cv[1,2]=r*s[1]*s[2];
+  cv[2,1]=r*s[1]*s[2];
+}
+
+model{
+  y~multi_normal(m,cv);
+}
+```
+
+ex4-42.stan
+```
+data{
+  int N;
+  matrix[2,2] dp;
+}
+
+parameters{
+  vector<lower=0>[2] s;
+  real<lower=-1,upper=1> r;
+}
+
+transformed parameters{
+  cov_matrix[2] cv;
+  cv[1,1]=s[1]^2;
+  cv[2,2]=s[2]^2;
+  cv[1,2]=r*s[1]*s[2];
+  cv[2,1]=r*s[1]*s[2];
+}
+
+model{
+  dp~wishart(N-1,cv);
+}
+```
+
+ex4-43.stan
+```
+data{
+  int N;
+  int M;
+  matrix[M,M] dp;
+}
+
+parameters{
+  vector<lower=0>[M] s;
+  corr_matrix[M] r;
+}
+
+transformed parameters{
+  cov_matrix[M] cv;
+  cv=quad_form_diag(r,s);
+}
+
+model{
+  dp~wishart(N-1,cv);
+}
+```
+
+ex4-44.stan
+```
+data{
+  int N;
+  int K;
+  array[N] vector[K] y;
+}
+parameters{
+  vector[K] m;
+  cov_matrix[K] cov;
+}
+model{
+  y~multi_normal(m,cov);
+}
+```
+
+
+```{r}
+library(MASS)
+n=20
+y=mvrnorm(n,c(0,0),matrix(c(1,0.7,0.7,1),2),2)
+cov(y)
+cor(y)
+plot(y)
+```
+
+```{r}
+#estimate covariance
+mdl=cmdstan_model('./ex4-41.stan')
+
+data=list(N=n,y=y)
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc,ch=F)
+```
+
+```{r}
+#estimate correlation,covariance
+#deviation product sum matirix folows Wishart dist.
+#deviation product sum = covariance * n-1 or n
+
+mdl=cmdstan_model('./ex4-42.stan')
+
+data=list(N=n,dp=cov(y)*(n-1))
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc,ch=F)
+```
+
+```{r}
+#estimate correlation,covariance
+mdl=cmdstan_model('./ex4-43.stan')
+
+m=2
+data=list(N=n,M=m,dp=cov(y)*(n-1))
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc,ch=F)
+```
+
+```{r}
+mdl=cmdstan_model('./ex4-44.stan')
+
+k=2
+data=list(N=n,K=k,y=y)
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc,ch=F)
+```
+

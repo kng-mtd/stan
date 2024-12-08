@@ -1,0 +1,694 @@
+---
+title: "stanEx2"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=T,warning=F,message=F)
+suppressWarnings(
+  suppressMessages(
+    suppressPackageStartupMessages({
+      library(stats)
+      library(MASS)
+      library(tidyverse)
+    })
+  )
+)
+options(scipen=100,digits=3)
+library(cmdstanr)
+options(mc.cores=parallel::detectCores())
+options(cmdstanr_max_rows=1000)
+library(gridExtra)
+```
+
+
+ex5 regression
+\
+ex5.stan
+```
+data{
+  int N;
+  int K;
+  vector[N] y;
+  matrix[N,K] X;
+}
+parameters{
+  vector[K] b;
+  real<lower=0> s;
+}
+model{
+  vector[N] m=X*b;
+  y~normal(m,s);
+}
+generated quantities{
+  vector[N] y1;
+  vector[N] m1=X*b;
+  for(i in 1:N){
+    y1[i]=normal_rng(m1[i],s);
+  }
+}
+```
+
+
+normal linear models
+```{r}
+n=30
+mdl=cmdstan_model('./ex5.stan')
+```
+
+
+single regression
+```{r}
+tb=tibble(x=runif(n,0,9),
+          y=rnorm(n,x,1))
+f=formula(y~x)
+par(mfrow=c(1,1))
+plot(tb$x,tb$y)
+qplot(data=tb,x,y)
+
+X=model.matrix(f,tb)
+
+data=list(N=nrow(X),K=ncol(X),y=tb$y,X=X)
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc,exc='m',ch=F)
+
+y1=mcmc$draws('y1')
+smy=summary(y1)
+
+tb$y1=smy$median
+tb$l5=smy$q5
+tb$u5=smy$q95
+
+par(mfrow=c(1,1))
+plot(tb$y,tb$y1,xlab='obs.',ylab='prd.')
+abline(0,1)
+qplot(data=tb,y,y1,xlab='obs.',ylab='prd.')+geom_abline(intercept=0,slope=1)
+
+par(mfrow=c(1,2))
+hist(tb$y-tb$y1,xlab='obs.-prd.',main='residual')
+density(tb$y-tb$y1) |> plot(xlab='obs.-prd.',main='residual')
+
+tb=arrange(tb,y1)
+
+par(mfrow=c(1,1))
+ylim=c(min(tb$l5),max(tb$u5))
+plot(tb$y,ylim=ylim,ylab='y',col='red')
+par(new=T)
+plot(tb$y1,ylim=ylim,ylab='',col='black')
+par(new=T)
+plot(tb$l5,ylim=ylim,ylab='',type='l',col='gray')
+par(new=T)
+plot(tb$u5,ylim=ylim,ylab='',type='l',col='gray')
+
+
+
+qplot(1:n,y,data=tb,col=I('red'))+
+  geom_point(aes(x=1:n,y=y1),tb,col='black')+
+  geom_line(aes(x=1:n,y=l5),tb,col='gray')+
+  geom_line(aes(x=1:n,y=u5),tb,col='gray')
+```
+
+
+multiple regression
+```{r}
+tb=tibble(x1=runif(n,0,9),x2=runif(n,0,9),
+          y=rnorm(n,x1-x2,1))
+f=formula(y~x1+x2)
+par(mfrow=c(1,2))
+plot(tb$x1,tb$y)
+plot(tb$x2,tb$y)
+
+X=model.matrix(f,tb)
+data=list(N=nrow(X),K=ncol(X),y=tb$y,X=X)
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc,exc='m',ch=F)
+
+y1=mcmc$draws('y1')
+smy=summary(y1)
+
+tb$y1=smy$median
+tb$l5=smy$q5
+tb$u5=smy$q95
+
+par(mfrow=c(1,1))
+plot(tb$y,tb$y1,xlab='obs.',ylab='prd.')
+abline(0,1)
+qplot(data=tb,y,y1,xlab='obs.',ylab='prd.')+geom_abline(intercept=0,slope=1)
+
+par(mfrow=c(1,2))
+hist(tb$y-tb$y1,xlab='obs.-prd.',main='residual')
+density(tb$y-tb$y1) |> plot(xlab='obs.-prd.',main='residual')
+
+tb=arrange(tb,y1)
+par(mfrow=c(1,1))
+ylim=c(min(tb$l5),max(tb$u5))
+plot(tb$y,ylim=ylim,ylab='y',col='red')
+par(new=T)
+plot(tb$y1,ylim=ylim,ylab='',col='black')
+par(new=T)
+plot(tb$l5,ylim=ylim,ylab='',type='l',col='gray')
+par(new=T)
+plot(tb$u5,ylim=ylim,ylab='',type='l',col='gray')
+
+
+
+qplot(1:n,y,data=tb,col=I('red'))+
+  geom_point(aes(x=1:n,y=y1),tb,col='black')+
+  geom_line(aes(x=1:n,y=l5),tb,col='gray')+
+  geom_line(aes(x=1:n,y=u5),tb,col='gray')
+```
+
+
+ANOVA
+```{r}
+tb=tibble(c=sample(c('a','b','c'),n,replace=T),
+          y=rnorm(n,(c=='b')*2-(c=='c')*2,1))
+f=formula(y~c)
+par(mfrow=c(1,1))
+boxplot(y~c,tb)
+qplot(data=tb,c,y,geom='boxplot')
+
+X=model.matrix(f,tb)
+data=list(N=nrow(X),K=ncol(X),y=tb$y,X=X)
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc,exc='m',ch=F)
+
+y1=mcmc$draws('y1')
+smy=summary(y1)
+
+tb$y1=smy$median
+tb$l5=smy$q5
+tb$u5=smy$q95
+
+lv=c(0,1,2)
+par(mfrow=c(1,1))
+plot(tb$y,tb$y1,pch=lv[factor(tb$c)],xlab='obs.',ylab='prd.')
+qplot(data=tb,y,y1,shape=c,size=I(2),xlab='obs.',ylab='prd.')
+plot(tb$y,tb$y1,col=1+lv[factor(tb$c)],xlab='obs.',ylab='prd.')
+qplot(data=tb,y,y1,col=c,xlab='obs.',ylab='prd.')
+
+par(mfrow=c(1,2))
+hist(tb$y-tb$y1,xlab='obs.-prd.',main='residual')
+density(tb$y-tb$y1) |> plot(xlab='obs.-prd.',main='residual')
+
+tb=arrange(tb,y1)
+par(mfrow=c(1,1))
+ylim=c(min(tb$l5),max(tb$u5))
+plot(tb$y,ylim=ylim,ylab='y',col='red',pch=lv[factor(tb$c)])
+par(new=T)
+plot(tb$y1,ylim=ylim,ylab='',col='black',pch=lv[factor(tb$c)])
+par(new=T)
+plot(tb$l5,ylim=ylim,ylab='',type='l',col='gray')
+par(new=T)
+plot(tb$u5,ylim=ylim,ylab='',type='l',col='gray')
+
+
+qplot(data=tb,1:n,y,col=c)+
+  geom_point(aes(x=1:n,y=y1),tb,col='black')+
+  geom_line(aes(x=1:n,y=l5),tb,col='gray')+
+  geom_line(aes(x=1:n,y=u5),tb,col='gray')
+```
+
+
+ANCOVA
+```{r}
+tb=tibble(x=runif(n,0,9),c=sample(c('a','b','c'),n,replace=T),
+          y=rnorm(n,x+(c=='b')*2-(c=='c')*2,1))
+
+f=formula(y~x+c)
+par(mfrow=c(1,1))
+#plot(tb$x1,tb$y,pch=tb$c1)
+
+lv=c(0,1,2)
+plot(tb$x,tb$y,pch=lv[factor(tb$c)])
+qplot(data=tb,x,y,shape=c,size=I(2))
+plot(tb$x,tb$y,col=1+lv[factor(tb$c)])
+qplot(data=tb,x,y,col=c)
+
+X=model.matrix(f,tb)
+data=list(N=nrow(X),K=ncol(X),y=tb$y,X=X)
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc,exc='m',ch=F)
+
+y1=mcmc$draws('y1')
+smy=summary(y1)
+
+tb$y1=smy$median
+tb$l5=smy$q5
+tb$u5=smy$q95
+
+lv=c(0,1,2)
+par(mfrow=c(1,1))
+plot(tb$y,tb$y1,pch=lv[factor(tb$c)],xlab='obs.',ylab='prd.')
+abline(0,1)
+plot(tb$y,tb$y1,col=1+lv[factor(tb$c)],xlab='obs.',ylab='prd.')
+abline(0,1)
+qplot(data=tb,y,y1,col=c,xlab='obs.',ylab='prd.')+
+  geom_abline(intercept=0,slope=1)
+
+par(mfrow=c(1,2))
+hist(tb$y-tb$y1,xlab='obs.-prd.',main='residual')
+density(tb$y-tb$y1) |> plot(xlab='obs.-prd.',main='residual')
+
+tb=arrange(tb,y1)
+par(mfrow=c(1,1))
+ylim=c(min(tb$l5),max(tb$u5))
+plot(tb$y,ylim=ylim,ylab='y',col='red',pch=lv[factor(tb$c)])
+par(new=T)
+plot(tb$y1,ylim=ylim,ylab='',col='black',pch=lv[factor(tb$c)])
+par(new=T)
+plot(tb$l5,ylim=ylim,ylab='',type='l',col='gray')
+par(new=T)
+plot(tb$u5,ylim=ylim,ylab='',type='l',col='gray')
+
+
+qplot(data=tb,1:n,y,col=c)+
+  geom_point(aes(x=1:n,y=y1),tb,col='black')+
+  geom_line(aes(x=1:n,y=l5),tb,col='gray')+
+  geom_line(aes(x=1:n,y=u5),tb,col='gray')
+```
+
+
+ex6
+
+
+generalized linear regression
+
+```
+poisson regression
+
+objective variable [0,Infinity), integer. variance of error is near to mean  
+(normal linear regression, correlation is near to 1,-1, variance of error is constant)  
+
+# of samples is N,  
+log li=sum(bj*xji),j=[0,K],i=[1,N]  
+yi~Po(li)  
+ or  
+li=sum(bj xji),j=[0,k]  
+yi~Po(exp li)  
+
+when xj -> xj +1, y -> y* exp bj   
+```
+
+ex6-1.stan
+```
+data{
+  int N;
+  int K;
+  array[N] int y;
+  matrix[N,K] X;
+}
+parameters{
+  vector[K] b;
+}
+model{
+  vector[N] l=X*b;
+  y~poisson_log(l);
+}
+generated quantities{
+  array[N] int y1;
+  vector[N] l1=X*b;
+  for(i in 1:N){
+    y1[i]=poisson_log_rng(l1[i]);
+  }
+}
+```
+
+
+```{r}
+n=30
+tb=tibble(x=runif(n,-1,1),c=sample(c('a','b'),n,replace=T),
+          y=rpois(n,exp(x+(c=='b')*0.5)))
+f=formula(y~x+c)
+qplot(data=tb,x,y,col=c)
+
+glm(f,tb,family='poisson')
+
+X=model.matrix(f,tb)
+
+data=list(N=nrow(X),K=ncol(X),y=tb$y,X=X)
+
+mdl=cmdstan_model('./ex6-1.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc,exc='l1',ch=F)
+
+y1=mcmc$draws('y1')
+smy=summary(y1)
+
+table(tb$y,smy$median)
+cat('\n')
+table(tb$y,smy$median,tb$c)
+
+par(mfrow=c(1,2))
+hist(tb$y-smy$median,xlab='obs.-prd.',main='residual')
+density(tb$y-smy$median) |> plot(xlab='obs.-prd.',main='residual')
+
+
+map=c()
+for(i in 1:n){
+  a=table(y1[,,i])
+  map[i]=as.integer(names(a[a==max(a)]))
+}
+table(tb$y,map)
+cat('\n')
+table(tb$y,map,tb$c)
+
+par(mfrow=c(1,2))
+hist(tb$y-map,xlab='obs.-map',main='residual')
+density(tb$y-map) |> plot(xlab='obs.-map',main='residual')
+```
+
+```
+logistic regression   
+
+# of samples is N,  
+objective variable 0/1 binary  
+  
+probability of incident pi[0,1]  
+logit pi=log(pi/ 1-pi)=sum(bj*xji),j=[0,K],i=[1,N] (-Infinity, Infinity)  
+
+yi~Ber(pi), 0/1 binary  
+
+odds(x)=p(x)/ 1-p(x), probablity of incident / probablity of no incident  
+odds ratio(x0,x1)=odds(x1)/odd(x0)  
+  
+when xj -> xj +1, odds ratio -> odds ratio *exp bj  
+```
+
+ex6-2.stan
+```
+data{
+  int N;
+  int K;
+  array[N] int y;
+  matrix[N,K] X;
+}
+parameters{
+  vector[K] b;
+}
+model{
+  vector[N] z=X*b;
+  y~bernoulli_logit(z);
+}
+generated quantities{
+  array[N] int y1;
+  vector[N] z1=X*b;
+  for(i in 1:N){
+    y1[i]=bernoulli_rng(inv_logit(z1[i]));
+  }
+}
+```
+
+
+```{r}
+n=30
+x=runif(n,-1,1)
+c=sample(c('a','b'),n,replace=T)
+z=x+(c=='b')
+y=rbinom(n,1,1/(1+exp(-z)))
+tb=tibble(x=x,c=c,y=y)
+
+f=formula(y~x+c)
+qplot(data=tb,x,y,col=c)
+
+glm(f,tb,family='binomial') # it can caluculte when all trials are once
+
+X=model.matrix(f,tb)
+data=list(N=nrow(X),K=ncol(X),y=tb$y,X=X)
+
+mdl=cmdstan_model('./ex6-2.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc,exc='z1',ch=F)
+
+y1=mcmc$draws('y1')
+smy=summary(y1)
+
+table(tb$y,smy$median)
+cat('\n')
+table(tb$y,smy$median,tb$c)
+
+par(mfrow=c(1,2))
+hist(tb$y-smy$median,xlab='obs.-prd.',main='residual')
+density(tb$y-smy$median) |> plot(xlab='obs.-prd.',main='residual')
+
+map=c()
+for(i in 1:n){
+  a=table(y1[,,i])
+  map[i]=as.integer(names(a[a==max(a)]))
+}
+table(tb$y,map)
+cat('\n')
+table(tb$y,map,tb$c)
+
+par(mfrow=c(1,2))
+hist(tb$y-map,xlab='obs.-map',main='residual')
+density(tb$y-map) |> plot(xlab='obs.-map',main='residual')
+```
+
+```
+multi logistic regression  
+
+# of samples is N,  
+# of trials of a sample i is mi,  
+objective variable [0,n], integer  
+  
+probability of incident pi[0,1]  
+logit pi=log(pi/ 1-pi)=sum(bj*xji),j=[0,K],i=[1,N] (-Infinity, Infinity)  
+
+yi~B(mi, pi), # of acutual incident  
+
+odds(x)=p(x)/ 1-p(x), probablity of incident / probablity of no incident  
+odds ratio(x0,x1)=odds(x1)/odd(x0)  
+  
+when xj -> xj +1, odds ratio -> odds ratio *exp bj  
+```
+
+ex6-3.stan
+```
+data{
+  int N;
+  int K;
+  array[N] int m;
+  array[N] int y;
+  matrix[N,K] X;
+}
+parameters{
+  vector[K] b;
+}
+model{
+  vector[N] z=X*b;
+  y~binomial_logit(m,z);
+}
+generated quantities{
+  array[N] int y1;
+  vector[N] z1=X*b;
+  for(i in 1:N){
+    y1[i]=binomial_rng(m[i],inv_logit(z1[i]));
+  }
+}
+```
+
+
+```{r}
+n=30
+m=floor(runif(n,1,10)) # trials are varying (1,10)
+x=runif(n,-1,1)
+c=sample(c('a','b'),n,replace=T)
+z=x+(c=='b')
+y=rbinom(n,m,1/(1+exp(-z)))
+tb=tibble(x=x,c=c,y=y)
+
+f=formula(y~x+c)
+qplot(data=tb,x,y,col=c)
+
+X=model.matrix(f,tb)
+data=list(N=nrow(X),K=ncol(X),y=tb$y,X=X,m=m)
+
+mdl=cmdstan_model('./ex6-3.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc,exc='z1',ch=F)
+
+y1=mcmc$draws('y1')
+smy=summary(y1)
+
+table(tb$y,smy$median)
+cat('\n')
+table(tb$y,smy$median,tb$c)
+
+par(mfrow=c(1,2))
+hist(tb$y-smy$median,xlab='obs.-prd.',main='residual')
+density(tb$y-smy$median) |> plot(xlab='obs.-prd.',main='residual')
+
+map=c()
+for(i in 1:n){
+  a=table(y1[,,i])
+  map[i]=as.integer(names(a[a==max(a)]))
+}
+table(tb$y,map)
+cat('\n')
+table(tb$y,map,tb$c)
+
+par(mfrow=c(1,2))
+hist(tb$y-map,xlab='obs.-map',main='residual')
+density(tb$y-map) |> plot(xlab='obs.-map',main='residual')
+```
+
+
+ex7
+interaction of variables
+```{r}
+n=50
+mdl=cmdstan_model('./ex5.stan')
+
+tb=tibble(x=runif(n,-3,3),
+          ca=sample(c('a','b'),n,replace=T),cb=sample(c('a','b'),n,replace=T),
+          y=rnorm(n,x+(ca=='b')+(cb=='b')-(ca=='b')*(cb=='b'),1))
+
+grid.arrange(qplot(data=tb,x,y,col=ca),
+             qplot(data=tb,x,y,col=cb),ncol=2)
+
+fn=function(f){
+X=model.matrix(f,tb)
+data=list(N=nrow(X),K=ncol(X),y=tb$y,X=X)
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc,exc='m',ch=F)
+
+y1=mcmc$draws('y1')
+smy=summary(y1)
+
+tb$y1=smy$median
+tb$l5=smy$q5
+tb$u5=smy$q95
+
+grid.arrange(
+  qplot(data=tb,y,y1,xlab='obs.',ylab='prd.')+geom_abline(intercept=0,slope=1))
+
+par(mfrow=c(1,2))
+hist(tb$y-tb$y1,xlab='obs.-prd.',main='residual')
+density(tb$y-tb$y1) |> plot(xlab='obs.-prd.',main='residual')
+
+tb=arrange(tb,y1)
+grid.arrange(
+  qplot(data=tb,1:n,y,col=ca)+
+    geom_point(aes(x=1:n,y=y1),tb,col='black')+
+    geom_line(aes(x=1:n,y=l5),tb,col='gray')+
+    geom_line(aes(x=1:n,y=u5),tb,col='gray'),
+  qplot(data=tb,1:n,y,col=cb)+
+    geom_point(aes(x=1:n,y=y1),tb,col='black')+
+    geom_line(aes(x=1:n,y=l5),tb,col='gray')+
+    geom_line(aes(x=1:n,y=u5),tb,col='gray'),
+  ncol=2
+)
+}
+
+
+f0=formula(y~x+ca)
+f1=formula(y~x+ca+cb)
+f2=formula(y~x+ca*cb)
+
+fn(f0)
+fn(f1)
+fn(f2)
+```
+
+
+```{r}
+tb=tibble(xa=runif(n,-2,2),xb=runif(n,-2,2),
+          ca=sample(c('a','b'),n,replace=T),cb=sample(c('a','b'),n,replace=T),
+          y=rnorm(n,xa+xb-xa*xb+(ca=='b')*2+(cb=='b')*2-(ca=='b')*(cb=='b'),1))
+
+grid.arrange(qplot(data=tb,xa,y,col=ca),
+             qplot(data=tb,xa,y,col=cb),
+             qplot(data=tb,xb,y,col=ca),
+             qplot(data=tb,xb,y,col=cb))
+
+
+fn=function(f){
+X=model.matrix(f,tb)
+data=list(N=nrow(X),K=ncol(X),y=tb$y,X=X)
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc,exc='m',ch=F)
+
+y1=mcmc$draws('y1')
+smy=summary(y1)
+
+tb$y1=smy$median
+tb$l5=smy$q5
+tb$u5=smy$q95
+
+grid.arrange(
+  qplot(data=tb,y,y1,xlab='obs.',ylab='prd.')+geom_abline(intercept=0,slope=1))
+
+par(mfrow=c(1,2))
+hist(tb$y-tb$y1,xlab='obs.-prd.',main='residual')
+density(tb$y-tb$y1) |> plot(xlab='obs.-prd.',main='residual')
+
+tb=arrange(tb,y1)
+grid.arrange(
+  qplot(data=tb,1:n,y,col=ca)+
+    geom_point(aes(x=1:n,y=y1),tb,col='black')+
+    geom_line(aes(x=1:n,y=l5),tb,col='gray')+
+    geom_line(aes(x=1:n,y=u5),tb,col='gray'),
+  qplot(data=tb,1:n,y,col=cb)+
+    geom_point(aes(x=1:n,y=y1),tb,col='black')+
+    geom_line(aes(x=1:n,y=l5),tb,col='gray')+
+    geom_line(aes(x=1:n,y=u5),tb,col='gray'),
+  ncol=2
+)
+}
+
+
+f0=formula(y~xa+xb+ca+cb)
+f1=formula(y~xa+xb+ca*cb)
+f2=formula(y~xa*xb+ca*cb)
+
+fn(f0)
+fn(f1)
+fn(f2)
+```
+
