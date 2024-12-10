@@ -272,37 +272,37 @@ object type and its difinition of single and array
     integer int x, array[N] int x, array[N,M] int x
     real    real x, array[N] real x, array[N,M] real x
       for array[N] int/real x
-        x[i]      $x_i$
-        x[i1:i2]  array $(x_{i1}...x_{i2})$
+        x[i]      x_i
+        x[i1:i2]  array (x_i1...x_i2)
       for array[N,M] int/real x
-        x[i,j]    $x_{ij}$
-        x[i]      array $(x_{i1}...x_{iM})$  
+        x[i,j]    x_ij
+        x[i]      array (x_i1...x_iM)  
   
   vector
     vector[K] x, array[N] vector[K] x
       for vector[K] x
-        x[i]      $x_i$
-        x[i1:i2]  vector $(x_{i1}...x_{i2})$
+        x[i]      x_i
+        x[i1:i2]  vector (x_i1...x_i2)
       for array[N] vector[K] x
-        x[i,k]    $x_{ik}$
+        x[i,k]    x_ik
         x[i]      vector[k] x[i]
   
     row_vector[K] x, array[N] row_vector[K] x
-    simplex[K] x        $x_i[0,1], \Sigma x_i=1$
-    unit_vector[K] x    $\Sigma x_i^2=1$
-    ordered[K] x        $x_1 < x_2 ... < x_K$
+    simplex[K] x        x_i[0,1], Σ x_i=1
+    unit_vector[K] x    Σ x_i^2=1
+    ordered[K] x        x_1 < x_2 ... < x_K
   
   matrix
     matrix[J,K] x, array[N] matrix[J,k] x
     cov_matrix[K] x     symmetric, all eigen>=0
-    corr_matrix[K] x    symmetric, all eigen>=0, $x_{ij}[0,1], x_{ii}=1$
+    corr_matrix[K] x    symmetric, all eigen>=0, x_ij [0,1], x_ii=1
       for matrix[J,K] x
-        x[j,k]    $x_{jk}$
-        x[j,]     row_vector[K] $x_j$
-        x[,k]     vector[J] $x_k$
+        x[j,k]    x_jk
+        x[j,]     row_vector[K] x_j
+        x[,k]     vector[J] x_k
         x[j1:j2,k1:k2]  matrix[j2-j1+1,k2-k1+1]
       for array[N] matrix[J,K] x
-        x[i]      matrix[J,K] $x_i$
+        x[i]      matrix[J,K] x_i
 
     to fasten a loop for doing matrix[J,K] x
         for(k in 1:K){
@@ -325,13 +325,13 @@ parameter constraint
 using simplex
   categorical distribution
     y~Cat(h)  
-      i=1~n, k=1~K, $y_i[1,K], h_k[0,1], \Sigma h_k=1$
-      $P[y=k]=h_k$
+      i=1~n, k=1~K, y_i[1,K], h_k[0,1], Σ h_k=1
+      P[y=k]=h_k
 
   data{
     int N;
     int K;
-    array[N] int<lower=1,upper=K> y; // R y[n],yi[1:K]
+    array[N] int<lower=1,upper=K> y; // R y[n],y_i[1,K]
   }
   parameters{
     simplex[K] h;
@@ -344,9 +344,9 @@ using simplex
 
   multinomial distribution
     y~multi(n,h)
-      i=1~n, k=1~K, $c_i[1:K], y_k=#(c_i=k), y_k[0,n]$  
-      $h_k[0,1], \Sigma h_k=1$  
-      $P[c=k]=h_k$  
+      i=1~n, k=1~K, c_i[1:K], y_k=#(c_i=k), y_k[0,n]  
+      h_k[0,1], Σ h_k=1  
+      P[c=k]=h_k  
 
   data{
     int K;
@@ -467,7 +467,7 @@ ex0-1.stan
 data{
   int N;
   int K;
-  int<lower=1,upper=K> y[N]; // R y[n],yi[1:K]
+  int<lower=1,upper=K> y[N]; // R y[n],y_i[1,K]
 }
 parameters{
   simplex[K] h;
