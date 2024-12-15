@@ -467,15 +467,13 @@ ex0-1.stan
 data{
   int N;
   int K;
-  int<lower=1,upper=K> y[N]; // R y[n],y_i[1,K]
-}
+  array[N] int<lower=1,upper=K> y; // R y[n],yi[1:K]
+}  
 parameters{
   simplex[K] h;
 }
 model{
-  for(i in 1:N){
-    y[i]~categorical(h);
-  }
+  y~categorical(h);
 }
 ```
 
