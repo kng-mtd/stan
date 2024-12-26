@@ -6,7 +6,15 @@ output:
     toc_depth: 3
     toc_float: true
     code_folding: show 
+#date: "`r Sys.Date()`"
+
 ---
+
+<style type="text/css">
+  body{
+  font-size: 12pt;
+}
+</style>
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo=T,warning=F,message=F)
@@ -19,6 +27,9 @@ suppressWarnings(
     })
   )
 )
+```
+
+```{r}
 options(scipen=100,digits=3)
 library(cmdstanr)
 options(mc.cores=parallel::detectCores())
@@ -106,14 +117,11 @@ qplot(x,y,col=I('red'))+
 ```
 
 
-ex9
-```
-explanatory variable obs.x also has noise  
-x~N(x0.sx)  
-y~N(b0+b1*x0,s)  
-```
+## explanatory variable obs.x have noise
+x~N(x0.sx),y~N(b0+b1*x0,s)  
 
-ex8-0.stan
+### ex8-0.stan
+normal regression without explanatory variable's noise
 ```
 data{
   int N;
@@ -147,7 +155,8 @@ generated quantities{
 ```
 
 
-ex9.stan
+### ex9.stan
+normal regression with explanatory variable's noise
 ```
 data{
   int N;
@@ -186,7 +195,6 @@ generated quantities{
   }
 }
 ```
-
 
 ```{r}
 n=20
@@ -243,12 +251,11 @@ qplot(x,y,col=I('red'))+
 
 
 
-ex10
-```
-outlier
-y~cauchy(b0+b1*x,s)
-```
-ex10.stan
+
+## outlier
+
+### ex10.stan
+objective variable have outlier, y~cauchy(b0+b1*x,s)
 ```
 data{
   int N;
@@ -281,7 +288,6 @@ generated quantities{
 }
 ```
 
-
 ```{r}
 n=20
 x=runif(n,0,9)
@@ -303,10 +309,8 @@ fn(mdl,data)
 
 
 
-ex11
+## censored data
 ```
-censored  
-
 y i=1-N, y~N(m,s)  
   acutualy        ya i=1-Na
   lower censored  yl i=1-Nl, y<L, P(y<L)=cdf(L-m /s)
@@ -317,7 +321,8 @@ ccdf(z) complementary CDF, P([z,Infinity),z~N(0,1))
 
 P(y | x,m,s)=P(ya i=1-Na)* P(yl i=1-Nl)* P(yu i=1-Nu)
 ```
-ex11.stan
+### ex11.stan
+objective variable is censored
 ```
 data{
   int N;
@@ -359,7 +364,6 @@ generated quantities{
   }
 }
 ```
-
 
 ```{r}
 n0=20
@@ -460,21 +464,19 @@ qplot(x,y,col=I('red'))+
 
 
 
-```
-bimodal distribution
-mixed normal distribution
-```
+## appendix: bimodal distribution, mixed normal distribution
+stan
 ```
 data {
-  int<lower=0> N;               // データの数
-  real y[N];                    // 観測データ
+  int<lower=0> N;
+  real y[N];
 }
 parameters {
-  real<lower=0, upper=1> theta; // 分布1と分布2の混合比率
-  real mu1;                     // 分布1の平均
-  real mu2;                     // 分布2の平均
-  real<lower=0> sigma1;         // 分布1の標準偏差
-  real<lower=0> sigma2;         // 分布2の標準偏差
+  real<lower=0, upper=1> theta; //ratio of mix
+  real mu1;
+  real mu2;
+  real<lower=0> sigma1;
+  real<lower=0> sigma2;
 }
 model {
   for (n in 1:N) {
@@ -485,7 +487,7 @@ model {
 }
 ```
 
-
+EM algorithm
 ```{r}
 y0=rnorm(100,0,1)
 y1=rnorm(100,-5,1)
@@ -494,7 +496,6 @@ y=sample(c(y0,y1,y2),100)
 density(y) |> plot()
 ```
 
-EM algorithm
 ```{r}
 library(mclust)
 

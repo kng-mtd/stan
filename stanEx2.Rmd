@@ -6,7 +6,15 @@ output:
     toc_depth: 3
     toc_float: true
     code_folding: show 
+#date: "`r Sys.Date()`"
+
 ---
+
+<style type="text/css">
+  body{
+  font-size: 12pt;
+}
+</style>
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo=T,warning=F,message=F)
@@ -19,12 +27,16 @@ suppressWarnings(
     })
   )
 )
+```
+
+```{r}
 options(scipen=100,digits=3)
 library(cmdstanr)
 options(mc.cores=parallel::detectCores())
 options(cmdstanr_max_rows=1000)
 library(gridExtra)
 ```
+
 
 execute mcmc sampling
 ```{r}
@@ -67,9 +79,10 @@ seeMCMC=function(mcmc,exc='',ch=T){ # exclude 'exc' parameters from seeing
 ```
 
 
-ex5 regression
-\
-ex5.stan
+## regression
+
+### ex5.stan
+multi normal regression
 ```
 data{
   int N;
@@ -102,7 +115,7 @@ mdl=cmdstan_model('./ex5.stan')
 ```
 
 
-single regression
+### single regression
 ```{r}
 tb=tibble(x=runif(n,0,9),
           y=rnorm(n,x,1))
@@ -159,7 +172,7 @@ qplot(1:n,y,data=tb,col=I('red'))+
 ```
 
 
-multiple regression
+### multiple regression
 ```{r}
 tb=tibble(x1=runif(n,0,9),x2=runif(n,0,9),
           y=rnorm(n,x1-x2,1))
@@ -214,7 +227,7 @@ qplot(1:n,y,data=tb,col=I('red'))+
 ```
 
 
-ANOVA
+### ANOVA
 ```{r}
 tb=tibble(c=sample(c('a','b','c'),n,replace=T),
           y=rnorm(n,(c=='b')*2-(c=='c')*2,1))
@@ -270,7 +283,7 @@ qplot(data=tb,1:n,y,col=c)+
 ```
 
 
-ANCOVA
+### ANCOVA
 ```{r}
 tb=tibble(x=runif(n,0,9),c=sample(c('a','b','c'),n,replace=T),
           y=rnorm(n,x+(c=='b')*2-(c=='c')*2,1))
@@ -334,14 +347,10 @@ qplot(data=tb,1:n,y,col=c)+
 ```
 
 
-ex6
+## generalized linear regression
 
-
-generalized linear regression
-
+### poisson regression
 ```
-poisson regression
-
 objective variable [0,Infinity), integer. variance of error is near to mean  
 (normal linear regression, correlation is near to 1,-1, variance of error is constant)  
 
@@ -355,7 +364,8 @@ yi~Po(exp li)
 when xj -> xj +1, y -> y* exp bj   
 ```
 
-ex6-1.stan
+### ex6-1.stan
+poisson regression
 ```
 data{
   int N;
@@ -428,9 +438,9 @@ hist(tb$y-map,xlab='obs.-map',main='residual')
 density(tb$y-map) |> plot(xlab='obs.-map',main='residual')
 ```
 
-```
-logistic regression   
 
+### logistic regression   
+```
 # of samples is N,  
 objective variable 0/1 binary  
   
@@ -445,7 +455,8 @@ odds ratio(x0,x1)=odds(x1)/odd(x0)
 when xj -> xj +1, odds ratio -> odds ratio *exp bj  
 ```
 
-ex6-2.stan
+### ex6-2.stan
+logistic regression 
 ```
 data{
   int N;
@@ -520,9 +531,9 @@ hist(tb$y-map,xlab='obs.-map',main='residual')
 density(tb$y-map) |> plot(xlab='obs.-map',main='residual')
 ```
 
-```
-multi logistic regression  
 
+### multi logistic regression  
+```
 # of samples is N,  
 # of trials of a sample i is mi,  
 objective variable [0,n], integer  
@@ -538,7 +549,8 @@ odds ratio(x0,x1)=odds(x1)/odd(x0)
 when xj -> xj +1, odds ratio -> odds ratio *exp bj  
 ```
 
-ex6-3.stan
+### ex6-3.stan
+multi logistic regression 
 ```
 data{
   int N;
@@ -614,8 +626,7 @@ density(tb$y-map) |> plot(xlab='obs.-map',main='residual')
 ```
 
 
-ex7
-interaction of variables
+### interaction of variable
 ```{r}
 n=50
 mdl=cmdstan_model('./ex5.stan')

@@ -6,7 +6,15 @@ output:
     toc_depth: 3
     toc_float: true
     code_folding: show 
+#date: "`r Sys.Date()`"
+
 ---
+
+<style type="text/css">
+  body{
+  font-size: 12pt;
+}
+</style>
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo=T,warning=F,message=F)
@@ -19,6 +27,9 @@ suppressWarnings(
     })
   )
 )
+```
+
+```{r}
 options(scipen=100,digits=3)
 library(cmdstanr)
 options(mc.cores=parallel::detectCores())
@@ -67,11 +78,8 @@ seeMCMC=function(mcmc,exc='',ch=T){ # exclude 'exc' parameters from seeing
 ```
 
 
-ex8
-```
-non linear regression 
-with one explanatory variable  
-```
+## non linear regression with one explanatory variable  
+
 ```{r}
 fn=function(mdl,data,smp=500,wrm=100){
 mle=mdl$optimize(data=data)
@@ -110,10 +118,9 @@ qplot(x,y,col=I('red'))+
 }
 ```
 
-```
-single linear regression
-```
-ex8-0.stan  
+
+### ex8-0.stan
+#### single linear regression
 ```
 data{
   int N;
@@ -146,7 +153,6 @@ generated quantities{
 }
 ```
 
-
 ```{r}
 n=20
 x=runif(n,0,20)
@@ -160,11 +166,12 @@ mdl=cmdstan_model('./ex8-0.stan')
 fn(mdl,data)
 ```
 
-```
-quadratic regression  
+
+### quadratic regression  
 y=b0+b2(x-b1)**2  
-```
-ex8-1.stan
+
+### ex8-1.stan
+quadratic regression 
 ```
 data{
   int N;
@@ -198,7 +205,6 @@ generated quantities{
 }
 ```
 
-
 ```{r}
 n=20
 x=runif(n,0,9)
@@ -215,12 +221,12 @@ fn(mdl,data)
 ```
 
 
-```
-both log regression  
+### both log regression  
 log y=b0+b1*log x   x,y>0
 y=exp b0 * x**b1
-```
-ex8-2.stan
+
+### ex8-2.stan
+both log regression 
 ```
 data{
   int N;
@@ -252,7 +258,6 @@ generated quantities{
   }
 }
 ```
-
 
 ```{r}
 n=20
@@ -312,10 +317,9 @@ qplot(log(x),log(y),col=I('red'))+
 ```
 
 
-ex8-3
-```
-exponential increasing/decreasing  
 
+### exponential increasing/decreasing  
+```
 y=b0* exp b1* x -> y~N(b0* exp(b1*x),s)  
 log y=log b0+b1* x  -> y~logN(log b0 +b1*x,s)
 x,y>0,b0>0
@@ -323,6 +327,7 @@ x,y>0,b0>0
 b1>0 x->Infinity,y->Infinity  
 b1<0 x->Infinity,y->+0  
 ```
+
 ```{r}
 n=20
 x=runif(n,0,5)
@@ -337,10 +342,9 @@ x1=seq(min(x),max(x),length.out=n1) # new data fpr predcition
 data=list(N=n,x=x,y=y,N1=n1,x1=x1)
 ```
 
-```
+
+### ex8-3-1.stan
 y=b0* exp b1* x -> y~N(b0* exp(b1*x),s)  
-```
-ex8-3-1.stan
 ```
 data{
   int N;
@@ -373,16 +377,14 @@ generated quantities{
 }
 ```
 
-
 ```{r}
 mdl=cmdstan_model('./ex8-3-1.stan')
 fn(mdl,data)
 ```
 
-```
+
+### ex8-3-2.stan
 log y=log b0+b1* x  -> y~logN(log b0 +b1*x,s)
-```
-ex8-3-2.stan
 ```
 data{
   int N;
@@ -465,14 +467,15 @@ qplot(x,log(y),col=I('red'))+
 ```
 
 
-ex8-4
-```
-growth curve  
 
+### growth curve  
+```
 y=b0* (1-exp(-b1* x)) -> y~N(1-exp(-b1*x),s)  
 x,y>0, b0,b1>0
 (x=0,y=0), (x->Infinity,y->b0)
 ```
+### ex8-4.stan
+growth curve
 ```
 data{
   int N;
@@ -505,7 +508,6 @@ generated quantities{
 }
 ```
 
-
 ```{r}
 n=20
 x=runif(n,0,9)
@@ -522,15 +524,16 @@ fn(mdl,data)
 ```
 
 
-ex8-5
-```
-sigmoid curve
 
+### sigmoid curve
+```
 y=Ym/ 1+exp(-b1* (x-b0)) -> y~B(Ym, 1+exp(-b1*(x-b0)))
 b0,b1>0
 x[0,Infinity), y[0,Ym]
 (x=b0, y=Ym/2)
 ```
+### ex8-5.stan
+sigmoid curve
 ```
 data{
   int N;
@@ -558,7 +561,6 @@ generated quantities{
   }
 }
 ```
-
 
 ```{r}
 n=20
@@ -590,15 +592,16 @@ qplot(x,y,col=I('red'))+
 ```
 
 
-ex8-6
-```
-up and down
 
+### up and down
+```
 y=b0(exp(-b1* x)-exp(-b2* x)) -> y~N(b0(exp(-b1* x)-exp(-b2* x)),s)
 b0,b1,b2>0, b1<b2
 x[0,Infinity), 0<y<b0
 (x=log b1-log b2 / b1-b2, y=max(y))
 ```
+### ex8-6.stan
+up and down
 ```
 data{
   int N;
@@ -631,7 +634,6 @@ generated quantities{
   }
 }
 ```
-
 
 ```{r}
 n=20

@@ -5,8 +5,16 @@ output:
     toc: true
     toc_depth: 3
     toc_float: true
-    code_folding: show 
+    code_folding: show
+#date: "`r Sys.Date()`"
+
 ---
+
+<style type="text/css">
+  body{
+  font-size: 12pt;
+}
+</style>
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo=T,warning=F,message=F)
@@ -19,6 +27,10 @@ suppressWarnings(
     })
   )
 )
+```
+
+
+```{r}
 options(scipen=100,digits=3)
 library(cmdstanr)
 options(mc.cores=parallel::detectCores())
@@ -26,10 +38,9 @@ options(cmdstanr_max_rows=1000)
 library(gridExtra)
 ```
 
+
+## use stan with cmdstanr
 ```
-use stan
-
-
 install.packages('cmdstanr',repos=c('https://mc-stan.org/r-packages/',getOption('repos')))
 
 library(cmdstanr)
@@ -47,7 +58,8 @@ options(mc.cores=parallel::detectCores())
 make stan file '---.stan'
 ```
 
-ex0-0.stan
+### ex0-0.stan
+Bernoulli distribution
 ```
 data{
   int N;
@@ -63,7 +75,7 @@ model{
 ```
 
 
-execute mcmc sampling
+## execute mcmc sampling function
 ```{r}
 goMCMC=function(mdl,data,smp=500,wrm=100,th=1){
   mcmc=mdl$sample(
@@ -121,7 +133,7 @@ drw %>% density() %>% plot()
 ```
 
 
-see mcmc result and parameters
+## see mcmc result and parameters function
 ```{r}
 seeMCMC=function(mcmc,exc='',ch=T){ # exclude 'exc' parameters from seeing
   print(mcmc)
@@ -154,7 +166,7 @@ seeMCMC(mcmc)
 ```
 
 
-save and load mdl,mcmc result
+## save and load mdl,mcmc result
 ```{r}
 saveRDS(mdl,'bin_mdl.rds')
 saveRDS(mcmc,'bin_mcmc.rds')
@@ -162,14 +174,14 @@ saveRDS(mcmc,'bin_mcmc.rds')
 mdl=readRDS('bin_mdl.rds')
 mcmc=readRDS('bin_mcmc.rds')
 
-library(qs)
+library(qs) #faster
 qsave(mcmc,'bin_mcmc.qs')
 mcmc=qread('bin_mcmc.qs')
 ```
 
 
 
-use formula and design matrix
+## use formula and design matrix
 ```{r}
 n=30
 tb=tibble(x=runif(n,0,9),y=rnorm(n,x,1))
@@ -206,7 +218,7 @@ model.matrix(f2,tb) # make categorical variable to dummy variable
 ```
 
 
-use brms
+## use brms
 ```{r}
 library(brms)
 
@@ -248,7 +260,7 @@ marginal_effects(rst,effects='x2:c1',method='predict') |> plot(points=T)
 ```
 
 
-stan syntax
+## stan syntax
 ```
 code block
   add semicolon ";" at the end of sentence
@@ -407,67 +419,68 @@ use vector, matrix instead of array to be fast
     }
 
 
-mixed model
-  data{
-    int N;
-    int K;
-    array[N] int<lower=1,upper=K> ID;
-    vector[N] x;
-    vector[N] y;
-  }
-  parameters{
-    real a0;
-    real b0;
-    vector[K] a;
-    vector[K] b;
-    real<lower=0> sa;
-    real<lower=0> sb;
-    real<lower=0> s;
-  }
-  model{
-    a~normal(a0,sa);
-    b~normal(b0,sb);
-    y~normal(a[ID]+b[ID].*x,s); // .* is multiply element by element
-  }
-
-
-K dimension multi normal distribution
-  data{
-    int N;
-    int K;
-    arrat[N] vector[K] y;
-  }
-  parameters{
-    vector[K] m;
-    cov_matrix[K] cov;
-  }
-  model{
-    y~multi_normal(m,cov);
-  }
-
-
-multi regression
-  data{
-    int N;
-    int K;
-    matrix[N,K] x; // model.matrix x from R 
-    vector[N] y;
-  }
-  parameters{
-    vector[k] b;
-    real<lower=0> s;
-  }
-  transformed parameters{
-    vector[k] m;
-    m=x*b;
-  }
-  model{
-    y~normal(m,s);
-  }
+    mixed model
+      data{
+        int N;
+        int K;
+        array[N] int<lower=1,upper=K> ID;
+        vector[N] x;
+        vector[N] y;
+      }
+      parameters{
+        real a0;
+        real b0;
+        vector[K] a;
+        vector[K] b;
+        real<lower=0> sa;
+        real<lower=0> sb;
+        real<lower=0> s;
+      }
+      model{
+        a~normal(a0,sa);
+        b~normal(b0,sb);
+        y~normal(a[ID]+b[ID].*x,s); // .* is multiply element by element
+      }
+    
+    
+    K dimension multi normal distribution
+      data{
+        int N;
+        int K;
+        arrat[N] vector[K] y;
+      }
+      parameters{
+        vector[K] m;
+        cov_matrix[K] cov;
+      }
+      model{
+        y~multi_normal(m,cov);
+      }
+    
+    
+    multi regression
+      data{
+        int N;
+        int K;
+        matrix[N,K] x; // model.matrix x from R 
+        vector[N] y;
+      }
+      parameters{
+        vector[k] b;
+        real<lower=0> s;
+      }
+      transformed parameters{
+        vector[k] m;
+        m=x*b;
+      }
+      model{
+        y~normal(m,s);
+      }
 ```
 
 
-ex0-1.stan
+### ex0-1.stan
+categorical distribution from raw value
 ```
 data{
   int N;
@@ -501,7 +514,8 @@ system.time({
 ```
 
 
-ex0-2.stan
+### ex0-2.stan
+categorical distribution from frequency
 ```
 data{
   int K;

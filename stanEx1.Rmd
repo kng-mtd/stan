@@ -6,7 +6,15 @@ output:
     toc_depth: 3
     toc_float: true
     code_folding: show 
+#date: "`r Sys.Date()`"
+
 ---
+
+<style type="text/css">
+  body{
+  font-size: 12pt;
+}
+</style>
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo=T,warning=F,message=F)
@@ -19,6 +27,9 @@ suppressWarnings(
     })
   )
 )
+```
+
+```{r}
 options(scipen=100,digits=3)
 library(cmdstanr)
 options(mc.cores=parallel::detectCores())
@@ -67,9 +78,10 @@ seeMCMC=function(mcmc,exc='',ch=T){ # exclude 'exc' parameters from seeing
 ```
 
 
-ex1 normal distribution
-\
-ex1.stan
+## normal distribution
+
+### ex1.stan
+normal distribution
 ```
 data{
   int N;
@@ -109,10 +121,8 @@ seeMCMC(mcmc)
 ```
 
 
-ex2 poisson distribution
+## poisson distribution
 
-
-ex2
 ```{r}
 y=rpois(20,3)
 summary(y)
@@ -123,7 +133,8 @@ density(y) |> plot(main='y')
 data=list(N=length(y),y=y)
 ```
 
-ex2-1.stan
+### ex2-1.stan
+in case fit poisson dist. to normal dist.
 ```
 data{
   int N;
@@ -164,7 +175,8 @@ hist(y1,main='y1')
 density(y1) |> plot(main='y1')     
 ```
 
-ex2-2.stan
+### ex2-2.stan
+fit to poisson dist.
 ```
 data{
   int N;
@@ -205,10 +217,10 @@ density(y1) |> plot(main='y1')
 ```
 
 
-ex3  
-difference test
+## difference test
 
-ex3.stan
+### ex3.stan
+mean difference of 2 normal distributions
 ```
 data{
   int N;
@@ -253,10 +265,10 @@ mean(d>0)
 ```
 
 
-ex4
+## normal regression
 
-
-ex4-1.stan
+### ex4-1.stan
+single normal regression
 ```
 data{
   int N;
@@ -305,7 +317,8 @@ plot(xy)
 ```
 
 
-ex4-2.stan
+### ex4-2.stan
+single normal regression, prediction from new explanatory variable
 ```
 data{
   int N;
@@ -393,7 +406,8 @@ qplot(x,y,col=I('red'))+
 ```
 
 
-ex4-3.stan
+### ex4-3.stan
+single normal regression, prediction from original explanatory variable
 ```
 data{
   int N;
@@ -447,8 +461,10 @@ density(y-smy$median) |> plot(xlab='obs.-prd.',main='residual')
 
 
 
-estimate correlation
-ex4-41.stan
+## estimate correlation
+
+### ex4-41.stan
+use covariance matrix and multinormal distribution  
 ```
 data{
   int N;
@@ -474,7 +490,8 @@ model{
 }
 ```
 
-ex4-42.stan
+### ex4-42.stan
+use covariance matrix and wishart distribution
 ```
 data{
   int N;
@@ -499,7 +516,8 @@ model{
 }
 ```
 
-ex4-43.stan
+### ex4-43.stan
+use correlation matrix and wishart distribution
 ```
 data{
   int N;
@@ -523,6 +541,7 @@ model{
 ```
 
 ex4-44.stan
+use covariance matrix and multinormal distribution
 ```
 data{
   int N;
