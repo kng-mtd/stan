@@ -38,7 +38,7 @@ install_cmdstan(cores=2)
 cmdstan_version()
 
 
-resttart R
+restart R
 
 
 options(mc.cores=parallel::detectCores())
