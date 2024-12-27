@@ -464,6 +464,56 @@ qplot(x,y,col=I('red'))+
 
 
 
+## sensitivity/specificity analysis
+
+### ex14.stan
+estimating sens and spec
+```
+data {
+  int N;
+  array[N] int x;
+  array[N] int y;
+}
+parameters {
+  real<lower=0,upper=1> p;
+  real<lower=0,upper=1> se;
+  real<lower=0,upper=1> sp;
+}
+model {
+  p~uniform(0,1);
+  se~uniform(0,1);
+  sp~uniform(0,1);
+  for (i in 1:N) {
+    y[i]~bernoulli(x[i]*se+(1-x[i])*(1-sp));
+  }
+}
+generated quantities {
+  real ppv;
+  real npv;
+  ppv=se*p/((se*p)+((1-p)*(1-sp)));
+  npv=(1-p)*sp/(((1-p)*sp)+(p*(1-se)));
+}
+```
+
+```{r}
+n=20
+data=list(N=n,
+          x=sample(0:1,n,replace=T),
+          y=sample(0:1,n,replace=T))
+
+mdl=cmdstan_model('./ex14.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+system.time({
+  mcmc=goMCMC(mdl,data)
+  seeMCMC(mcmc,ch=F)
+})
+```
+
+
+
 ## appendix: bimodal distribution, mixed normal distribution
 stan
 ```
