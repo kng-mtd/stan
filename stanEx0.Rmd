@@ -93,10 +93,10 @@ goMCMC=function(mdl,data,smp=500,wrm=100,th=1){
 
 
 ```{r}
+data=list(N=9,y=sample(0:1,9,replace=T))
+
 mdl=cmdstan_model('./ex0-0.stan')
 #mdl$exe_file()
-
-data=list(N=9,y=sample(0:1,9,replace=T))
 
 mle=mdl$optimize(data=data)
 mle
@@ -501,8 +501,9 @@ h=c(0.4,0.3,0.2,0.1)
 y=sample(c0,20,h,replace=T)
 table(y) |> prop.table()
 
-mdl=cmdstan_model('./ex0-1.stan')
 data=list(N=length(y),K=length(c0),y=y)
+
+mdl=cmdstan_model('./ex0-1.stan')
 
 mle=mdl$optimize(data=data)
 mle
@@ -536,8 +537,9 @@ c=sample(c0,20,h,replace=T)
 table(c) |> prop.table()
 y=table(factor(c,levels=1:length(c0)))
 
-mdl=cmdstan_model('./ex0-2.stan')
 data=list(K=length(c0),y=y)
+
+mdl=cmdstan_model('./ex0-2.stan')
 
 mle=mdl$optimize(data=data)
 mle
@@ -548,3 +550,103 @@ system.time({
 })
 ```
 
+
+
+## WAIC
+
+### ex0-3.stan
+```
+data{
+  int N;
+  vector[N] x;
+  vector[N] y;
+}
+parameters{
+  real b0;
+  real b1;
+  real<lower=0> s;
+}
+model{
+  target+=normal_lpdf(y|b0+b1*x,s);
+}
+generated quantities{
+  vector[N] ll;
+  for(i in 1:N){
+    ll[i]=normal_lpdf(y[i]|b0+b1*x[i],s);
+  }
+}
+```
+
+```{r}
+n=10
+x=runif(n,0,9)
+y=rnorm(n,x,1)
+data=list(N=n,x=x,y=y)
+
+mdl=cmdstan_model('./ex0-3.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+system.time({
+  mcmc=goMCMC(mdl,data)
+  seeMCMC(mcmc,exc='ll',ch=F)
+})
+
+ll=mcmc$draws('ll') |>
+  posterior::as_draws_df() |> 
+  select(contains('ll'))
+lppd=sum(log(colMeans(exp(ll))))
+pwaic=sum(apply(ll,2,var))
+waic=-2*lppd+2*pwaic
+
+```
+
+
+### ex0-4.stan
+```
+data {
+  int N;
+  vector[N] x;
+  array[N] int y;
+}
+parameters {
+  real b0;
+  real b1;
+}
+model {
+  target+=poisson_lpmf(y | exp(b0+b1*x));
+}
+generated quantities {
+  vector[N] ll;
+  for (i in 1:N) {
+    ll[i] = poisson_lpmf(y[i] | exp(b0+b1*x[i]));
+  }
+}
+```
+
+
+```{r}
+n=10
+x=runif(n,-1,1)
+y=rpois(n,exp(x))
+data=list(N=n,x=x,y=y)
+
+mdl=cmdstan_model('./ex0-4.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+system.time({
+  mcmc=goMCMC(mdl,data)
+  seeMCMC(mcmc,exc='ll',ch=F)
+})
+
+ll=mcmc$draws('ll') |>
+  posterior::as_draws_df() |> 
+  select(contains('ll'))
+lppd=sum(log(colMeans(exp(ll))))
+pwaic=sum(apply(ll,2,var))
+waic=-2*lppd+2*pwaic
+
+```
