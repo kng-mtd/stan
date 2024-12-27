@@ -1,0 +1,401 @@
+---
+title: "stanEx1-1"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    code_folding: show 
+#date: "`r Sys.Date()`"
+
+---
+
+<style type="text/css">
+  body{
+  font-size: 12pt;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=T,warning=F,message=F)
+suppressWarnings(
+  suppressMessages(
+    suppressPackageStartupMessages({
+      library(stats)
+      library(MASS)
+      library(tidyverse)
+    })
+  )
+)
+```
+
+```{r}
+options(scipen=100,digits=3)
+library(cmdstanr)
+options(mc.cores=parallel::detectCores())
+options(cmdstanr_max_rows=1000)
+library(gridExtra)
+```
+
+execute mcmc sampling
+```{r}
+goMCMC=function(mdl,data,smp=500,wrm=100,th=1){
+  mcmc=mdl$sample(
+  data=data,
+  seed=1,
+  chains=4,
+  iter_sampling=smp,
+  iter_warmup=wrm,
+  thin=th,
+  refresh=1000
+  )
+  mcmc
+}
+```
+
+see mcmc result and parameters
+```{r}
+seeMCMC=function(mcmc,exc='',ch=T){ # exclude 'exc' parameters from seeing
+  print(mcmc)
+  prs=mcmc$metadata()$model_params[-1] # reject lp__
+  for(pr in prs){
+    if(grepl('^y',pr)) next # not show predictive value "y*" information
+    if(exc!='' && grepl(paste0('^',exc),pr)) next
+    drw=mcmc$draws(pr)
+    if(ch){
+      par(mfrow=c(1,4))
+      drw[,1,] |> plot(type='l',main='chain1',ylab=pr)
+      drw[,2,] |> plot(type='l',main='chain2',ylab=pr)
+      drw[,3,] |> plot(type='l',main='chain3',ylab=pr)
+      drw[,4,] |> plot(type='l',main='chain4',ylab=pr)
+    }
+
+    par(mfrow=c(1,2))
+    drw |> hist(main=pr,xlab='')
+    drw |> density() |> plot(main=pr)    
+  }
+}
+```
+
+
+# distributions
+
+## normal distribution
+
+### ex1.stan
+```
+data{
+  int N;
+  vector[N] y;
+}
+parameters{
+  real m;
+  real<lower=0> s;
+}
+model{
+  y~normal(m,s);
+}
+```
+
+```{r}
+y=rnorm(10,2,1)
+summary(y)
+par(mfrow=c(1,2))
+hist(y,main='y')
+density(y) |> plot(main='y')
+
+data=list(N=length(y),y=y)
+
+mdl=cmdstan_model('./ex1.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+mcmc
+mcmc$metadata()$stan_variables
+mcmc$metadata()$model_params
+seeMCMC(mcmc)
+```
+
+
+## Bernoulli distribution
+
+### ex0-0.stan
+```
+data{
+  int N;
+  array[N] int y;
+}
+parameters{
+  real<lower=0,upper=1> p;
+}
+model{
+  p~beta(1,1);
+  y~bernoulli(p);
+}
+```
+
+```{r}
+data=list(N=9,y=sample(0:1,9,replace=T))
+
+mdl=cmdstan_model('./ex0-0.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+mcmc
+mcmc$metadata()$stan_variables
+mcmc$metadata()$model_params
+seeMCMC(mcmc)
+```
+
+
+## Poisson distribution
+
+### ex2-2.stan
+```
+data{
+  int N;
+  array[N] int y;
+}
+parameters{
+  real<lower=0> l;
+}
+model{
+  y~poisson(l);
+}
+generated quantities{
+  array[N] int y1;
+  for(i in 1:N)
+    y1[i]=poisson_rng(l);
+}
+```
+
+```{r}
+n=10
+y=rpois(n,3)
+summary(y)
+par(mfrow=c(1,2))
+hist(y,main='y')
+density(y) |> plot(main='y')
+
+data=list(N=n,y=y)
+
+mdl=cmdstan_model('./ex2-2.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc)
+
+y1=mcmc$draws('y1')
+par(mfrow=c(1,2))
+hist(y1,main='y1')
+density(y1) |> plot(main='y1') 
+```
+
+
+## binomial distribution
+
+### ex2-3.stan
+```
+data{
+  int N;
+  array[N] int n;
+  array[N] int y;
+}
+parameters{
+  real<lower=0> p;
+}
+model{
+  y~binomial(n,p);
+}
+```
+
+```{r}
+n=10
+n0=floor(runif(n,1,10))
+y=rbinom(n,n0,0.3)
+
+data=list(N=n,n=n0,y=y)
+
+mdl=cmdstan_model('./ex2-3.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc)
+```
+
+
+## log normal distribution
+
+### ex2-4.stan
+```
+data{
+  int N;
+  vector[N]<lower=0> y;
+}
+parameters{
+  real m;
+  real<lower=0> s;
+}
+model{
+  y~lognormal(m,s);
+}
+```
+
+```{r}
+n=10
+y=rlnorm(n,2,1)
+summary(y)
+par(mfrow=c(1,2))
+hist(y,main='y')
+density(y) |> plot(main='y')
+
+data=list(N=n,y=y)
+
+mdl=cmdstan_model('./ex2-4.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+mcmc
+mcmc$metadata()$stan_variables
+mcmc$metadata()$model_params
+seeMCMC(mcmc)
+```
+
+
+## gamma distribution
+
+### ex2-5.stan
+```
+data{
+  int N;
+  vector[N] y;
+}
+parameters{
+  real<lower=0> a;
+  real<lower=0> l;
+}
+model{
+  y~gamma(a,l);
+}
+```
+
+```{r}
+n=10
+y=rgamma(n,2,1)
+summary(y)
+par(mfrow=c(1,2))
+hist(y,main='y')
+density(y) |> plot(main='y')
+
+data=list(N=n,y=y)
+
+mdl=cmdstan_model('./ex2-5.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+mcmc
+mcmc$metadata()$stan_variables
+mcmc$metadata()$model_params
+seeMCMC(mcmc)
+```
+
+
+## beta distribution
+
+### ex2-6.stan
+```
+data{
+  int N;
+  vector[N] y;
+}
+parameters{
+  real<lower=0> a;
+  real<lower=0> b;
+}
+model{
+  y~beta(a,b);
+}
+```
+
+```{r}
+n=20
+y=rbeta(n,1,2)
+summary(y)
+par(mfrow=c(1,2))
+hist(y,main='y')
+density(y) |> plot(main='y')
+
+data=list(N=n,y=y)
+
+mdl=cmdstan_model('./ex2-6.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+mcmc
+mcmc$metadata()$stan_variables
+mcmc$metadata()$model_params
+seeMCMC(mcmc)
+```
+
+
+## dirichlet distribution
+
+### ex2-7.stan
+```
+data {
+  int N;
+  int K;
+  matrix[N, K] y;
+}
+parameters {
+  vector<lower=0>[K] p;
+}
+model {
+  for(i in 1:N){
+     y[i]~dirichlet(p);
+  }
+}
+```
+
+```{r}
+library(gtools)
+n=20
+y=rdirichlet(n,c(0.5,0.3,0.2))
+summary(y)
+boxplot(y)
+
+data=list(N=n,K=ncol(y),y=y)
+
+mdl=cmdstan_model('./ex2-7.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+mcmc
+mcmc$metadata()$stan_variables
+mcmc$metadata()$model_params
+seeMCMC(mcmc)
+```
