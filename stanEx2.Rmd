@@ -79,10 +79,12 @@ seeMCMC=function(mcmc,exc='',ch=T){ # exclude 'exc' parameters from seeing
 ```
 
 
-## regression
+# regression
 
-### ex5.stan
-multi normal regression
+## normal linear model
+
+### ex5-1.stan
+normal regression
 ```
 data{
   int N;
@@ -107,11 +109,9 @@ generated quantities{
 }
 ```
 
-
-normal linear models
 ```{r}
 n=30
-mdl=cmdstan_model('./ex5.stan')
+mdl=cmdstan_model('./ex5-1.stan')
 ```
 
 
@@ -347,289 +347,11 @@ qplot(data=tb,1:n,y,col=c)+
 ```
 
 
-## generalized linear regression
 
-### poisson regression
-```
-objective variable [0,Infinity), integer. variance of error is near to mean  
-(normal linear regression, correlation is near to 1,-1, variance of error is constant)  
-
-# of samples is N,  
-log li=sum(bj*xji),j=[0,K],i=[1,N]  
-yi~Po(li)  
- or  
-li=sum(bj xji),j=[0,k]  
-yi~Po(exp li)  
-
-when xj -> xj +1, y -> y* exp bj   
-```
-
-### ex6-1.stan
-poisson regression
-```
-data{
-  int N;
-  int K;
-  array[N] int y;
-  matrix[N,K] X;
-}
-parameters{
-  vector[K] b;
-}
-model{
-  vector[N] l=X*b;
-  y~poisson_log(l);
-}
-generated quantities{
-  array[N] int y1;
-  vector[N] l1=X*b;
-  for(i in 1:N){
-    y1[i]=poisson_log_rng(l1[i]);
-  }
-}
-```
-
-
-```{r}
-n=30
-tb=tibble(x=runif(n,-1,1),c=sample(c('a','b'),n,replace=T),
-          y=rpois(n,exp(x+(c=='b')*0.5)))
-f=formula(y~x+c)
-qplot(data=tb,x,y,col=c)
-
-glm(f,tb,family='poisson')
-
-X=model.matrix(f,tb)
-
-data=list(N=nrow(X),K=ncol(X),y=tb$y,X=X)
-
-mdl=cmdstan_model('./ex6-1.stan')
-
-mle=mdl$optimize(data=data)
-mle
-
-mcmc=goMCMC(mdl,data)
-
-seeMCMC(mcmc,exc='l1',ch=F)
-
-y1=mcmc$draws('y1')
-smy=summary(y1)
-
-table(tb$y,smy$median)
-cat('\n')
-table(tb$y,smy$median,tb$c)
-
-par(mfrow=c(1,2))
-hist(tb$y-smy$median,xlab='obs.-prd.',main='residual')
-density(tb$y-smy$median) |> plot(xlab='obs.-prd.',main='residual')
-
-
-map=c()
-for(i in 1:n){
-  a=table(y1[,,i])
-  map[i]=as.integer(names(a[a==max(a)]))
-}
-table(tb$y,map)
-cat('\n')
-table(tb$y,map,tb$c)
-
-par(mfrow=c(1,2))
-hist(tb$y-map,xlab='obs.-map',main='residual')
-density(tb$y-map) |> plot(xlab='obs.-map',main='residual')
-```
-
-
-### logistic regression   
-```
-# of samples is N,  
-objective variable 0/1 binary  
-  
-probability of incident pi[0,1]  
-logit pi=log(pi/ 1-pi)=sum(bj*xji),j=[0,K],i=[1,N] (-Infinity, Infinity)  
-
-yi~Ber(pi), 0/1 binary  
-
-odds(x)=p(x)/ 1-p(x), probablity of incident / probablity of no incident  
-odds ratio(x0,x1)=odds(x1)/odd(x0)  
-  
-when xj -> xj +1, odds ratio -> odds ratio *exp bj  
-```
-
-### ex6-2.stan
-logistic regression 
-```
-data{
-  int N;
-  int K;
-  array[N] int y;
-  matrix[N,K] X;
-}
-parameters{
-  vector[K] b;
-}
-model{
-  vector[N] z=X*b;
-  y~bernoulli_logit(z);
-}
-generated quantities{
-  array[N] int y1;
-  vector[N] z1=X*b;
-  for(i in 1:N){
-    y1[i]=bernoulli_rng(inv_logit(z1[i]));
-  }
-}
-```
-
-
-```{r}
-n=30
-x=runif(n,-1,1)
-c=sample(c('a','b'),n,replace=T)
-z=x+(c=='b')
-y=rbinom(n,1,1/(1+exp(-z)))
-tb=tibble(x=x,c=c,y=y)
-
-f=formula(y~x+c)
-qplot(data=tb,x,y,col=c)
-
-glm(f,tb,family='binomial') # it can caluculte when all trials are once
-
-X=model.matrix(f,tb)
-data=list(N=nrow(X),K=ncol(X),y=tb$y,X=X)
-
-mdl=cmdstan_model('./ex6-2.stan')
-
-mle=mdl$optimize(data=data)
-mle
-
-mcmc=goMCMC(mdl,data)
-
-seeMCMC(mcmc,exc='z1',ch=F)
-
-y1=mcmc$draws('y1')
-smy=summary(y1)
-
-table(tb$y,smy$median)
-cat('\n')
-table(tb$y,smy$median,tb$c)
-
-par(mfrow=c(1,2))
-hist(tb$y-smy$median,xlab='obs.-prd.',main='residual')
-density(tb$y-smy$median) |> plot(xlab='obs.-prd.',main='residual')
-
-map=c()
-for(i in 1:n){
-  a=table(y1[,,i])
-  map[i]=as.integer(names(a[a==max(a)]))
-}
-table(tb$y,map)
-cat('\n')
-table(tb$y,map,tb$c)
-
-par(mfrow=c(1,2))
-hist(tb$y-map,xlab='obs.-map',main='residual')
-density(tb$y-map) |> plot(xlab='obs.-map',main='residual')
-```
-
-
-### multi logistic regression  
-```
-# of samples is N,  
-# of trials of a sample i is mi,  
-objective variable [0,n], integer  
-  
-probability of incident pi[0,1]  
-logit pi=log(pi/ 1-pi)=sum(bj*xji),j=[0,K],i=[1,N] (-Infinity, Infinity)  
-
-yi~B(mi, pi), # of acutual incident  
-
-odds(x)=p(x)/ 1-p(x), probablity of incident / probablity of no incident  
-odds ratio(x0,x1)=odds(x1)/odd(x0)  
-  
-when xj -> xj +1, odds ratio -> odds ratio *exp bj  
-```
-
-### ex6-3.stan
-multi logistic regression 
-```
-data{
-  int N;
-  int K;
-  array[N] int m;
-  array[N] int y;
-  matrix[N,K] X;
-}
-parameters{
-  vector[K] b;
-}
-model{
-  vector[N] z=X*b;
-  y~binomial_logit(m,z);
-}
-generated quantities{
-  array[N] int y1;
-  vector[N] z1=X*b;
-  for(i in 1:N){
-    y1[i]=binomial_rng(m[i],inv_logit(z1[i]));
-  }
-}
-```
-
-
-```{r}
-n=30
-m=floor(runif(n,1,10)) # trials are varying (1,10)
-x=runif(n,-1,1)
-c=sample(c('a','b'),n,replace=T)
-z=x+(c=='b')
-y=rbinom(n,m,1/(1+exp(-z)))
-tb=tibble(x=x,c=c,y=y)
-
-f=formula(y~x+c)
-qplot(data=tb,x,y,col=c)
-
-X=model.matrix(f,tb)
-data=list(N=nrow(X),K=ncol(X),y=tb$y,X=X,m=m)
-
-mdl=cmdstan_model('./ex6-3.stan')
-
-mle=mdl$optimize(data=data)
-mle
-
-mcmc=goMCMC(mdl,data)
-
-seeMCMC(mcmc,exc='z1',ch=F)
-
-y1=mcmc$draws('y1')
-smy=summary(y1)
-
-table(tb$y,smy$median)
-cat('\n')
-table(tb$y,smy$median,tb$c)
-
-par(mfrow=c(1,2))
-hist(tb$y-smy$median,xlab='obs.-prd.',main='residual')
-density(tb$y-smy$median) |> plot(xlab='obs.-prd.',main='residual')
-
-map=c()
-for(i in 1:n){
-  a=table(y1[,,i])
-  map[i]=as.integer(names(a[a==max(a)]))
-}
-table(tb$y,map)
-cat('\n')
-table(tb$y,map,tb$c)
-
-par(mfrow=c(1,2))
-hist(tb$y-map,xlab='obs.-map',main='residual')
-density(tb$y-map) |> plot(xlab='obs.-map',main='residual')
-```
-
-
-### interaction of variable
+## interaction of variable
 ```{r}
 n=50
-mdl=cmdstan_model('./ex5.stan')
+mdl=cmdstan_model('./ex5-1.stan')
 
 tb=tibble(x=runif(n,-3,3),
           ca=sample(c('a','b'),n,replace=T),cb=sample(c('a','b'),n,replace=T),
@@ -748,3 +470,609 @@ fn(f1)
 fn(f2)
 ```
 
+
+
+## generalized linear regression
+
+### log normal regression
+```
+objective variable [0,Infinity)
+
+# of samples is N,  
+log mi=sum(bj*xji),j=[0,K],i=[1,N]  
+log yi~N(mi,s)  
+```
+
+### ex5-2.stan
+log normal regression
+```
+data{
+  int N;
+  int K;
+  vector[N] y;
+  matrix[N,K] X;
+}
+parameters{
+  vector[K] b;
+  real<lower=0> s;
+}
+model{
+  vector[N] m=X*b;
+  y~lognormal(m,s);
+}
+generated quantities{
+  vector[N] y1;
+  vector[N] m1=X*b;
+  for(i in 1:N){
+    y1[i]=lognormal_rng(m1[i],s);
+  }
+}
+```
+
+```{r}
+n=20
+tb=tibble(x1=runif(n,0,9),x2=runif(n,0,9),
+          y=rnorm(n,log(x1+x2),1))
+f=formula(y~x1+x2)
+par(mfrow=c(1,2))
+plot(tb$x1,tb$y)
+plot(tb$x2,tb$y)
+
+X=model.matrix(f,tb)
+data=list(N=nrow(X),K=ncol(X),y=tb$y,X=X)
+
+mdl=cmdstan_model('./ex5-2.stan')
+
+mle=mdl$optimize(data=data)  # it sometimes occur error and stop process
+mle
+
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc,exc='m',ch=F)
+
+y1=mcmc$draws('y1')
+smy=summary(y1)
+
+tb$y1=smy$median
+tb$l5=smy$q5
+tb$u5=smy$q95
+
+par(mfrow=c(1,1))
+plot(tb$y,tb$y1,xlab='obs.',ylab='prd.')
+abline(0,1)
+qplot(data=tb,y,y1,xlab='obs.',ylab='prd.')+geom_abline(intercept=0,slope=1)
+
+par(mfrow=c(1,2))
+hist(tb$y-tb$y1,xlab='obs.-prd.',main='residual')
+density(tb$y-tb$y1) |> plot(xlab='obs.-prd.',main='residual')
+
+tb=arrange(tb,y1)
+par(mfrow=c(1,1))
+ylim=c(min(tb$l5),max(tb$u5))
+plot(tb$y,ylim=ylim,ylab='y',col='red')
+par(new=T)
+plot(tb$y1,ylim=ylim,ylab='',col='black')
+par(new=T)
+plot(tb$l5,ylim=ylim,ylab='',type='l',col='gray')
+par(new=T)
+plot(tb$u5,ylim=ylim,ylab='',type='l',col='gray')
+
+
+
+qplot(1:n,y,data=tb,col=I('red'))+
+  geom_point(aes(x=1:n,y=y1),tb,col='black')+
+  geom_line(aes(x=1:n,y=l5),tb,col='gray')+
+  geom_line(aes(x=1:n,y=u5),tb,col='gray')
+```
+
+
+
+### poisson regression
+```
+objective variable [0,Infinity), integer. variance of error is near to mean  
+(normal linear regression, correlation is near to 1,-1, variance of error is constant)  
+
+# of samples is N,  
+log li=sum(bj*xji),j=[0,K],i=[1,N]  
+yi~Po(li)  
+ or  
+li=sum(bj*xji),j=[0,k]  
+yi~Po(exp li)  
+
+when xj -> xj +1, y -> y* exp bj   
+```
+
+### ex6-1.stan
+poisson regression
+```
+data{
+  int N;
+  int K;
+  array[N] int y;
+  matrix[N,K] X;
+}
+parameters{
+  vector[K] b;
+}
+model{
+  vector[N] l=X*b;
+  y~poisson_log(l);
+}
+generated quantities{
+  array[N] int y1;
+  vector[N] l1=X*b;
+  for(i in 1:N){
+    y1[i]=poisson_log_rng(l1[i]);
+  }
+}
+```
+
+```{r}
+n=30
+tb=tibble(x=runif(n,-1,1),c=sample(c('a','b'),n,replace=T),
+          y=rpois(n,exp(x+(c=='b')*0.5)))
+f=formula(y~x+c)
+qplot(data=tb,x,y,col=c)
+
+glm(f,tb,family='poisson')
+
+X=model.matrix(f,tb)
+
+data=list(N=nrow(X),K=ncol(X),y=tb$y,X=X)
+
+mdl=cmdstan_model('./ex6-1.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc,exc='l1',ch=F)
+
+y1=mcmc$draws('y1')
+smy=summary(y1)
+
+table(tb$y,smy$median)
+cat('\n')
+table(tb$y,smy$median,tb$c)
+
+par(mfrow=c(1,2))
+hist(tb$y-smy$median,xlab='obs.-prd.',main='residual')
+density(tb$y-smy$median) |> plot(xlab='obs.-prd.',main='residual')
+
+
+map=c()
+for(i in 1:n){
+  a=table(y1[,,i])
+  map[i]=as.integer(names(a[a==max(a)]))
+}
+table(tb$y,map)
+cat('\n')
+table(tb$y,map,tb$c)
+
+par(mfrow=c(1,2))
+hist(tb$y-map,xlab='obs.-map',main='residual')
+density(tb$y-map) |> plot(xlab='obs.-map',main='residual')
+```
+
+
+### logistic regression   
+```
+# of samples is N,  
+objective variable 0/1 binary  
+  
+probability of incident pi[0,1]  
+logit pi=log(pi/ 1-pi)=sum(bj*xji),j=[0,K],i=[1,N] (-Infinity, Infinity)  
+
+yi~Ber(pi), 0/1 binary  
+
+odds(x)=p(x)/ 1-p(x), probablity of incident / probablity of no incident  
+odds ratio(x0,x1)=odds(x1)/odd(x0)  
+  
+when xj -> xj +1, odds ratio -> odds ratio *exp bj  
+```
+
+### ex6-2.stan
+logistic regression 
+```
+data{
+  int N;
+  int K;
+  array[N] int y;
+  matrix[N,K] X;
+}
+parameters{
+  vector[K] b;
+}
+model{
+  vector[N] z=X*b;
+  y~bernoulli_logit(z);
+}
+generated quantities{
+  array[N] int y1;
+  vector[N] z1=X*b;
+  for(i in 1:N){
+    y1[i]=bernoulli_rng(inv_logit(z1[i]));
+  }
+}
+```
+
+```{r}
+n=30
+x=runif(n,-1,1)
+c=sample(c('a','b'),n,replace=T)
+z=x+(c=='b')
+y=rbinom(n,1,1/(1+exp(-z)))
+tb=tibble(x=x,c=c,y=y)
+
+f=formula(y~x+c)
+qplot(data=tb,x,y,col=c)
+
+glm(f,tb,family='binomial') # it can caluculte when all trials are once
+
+X=model.matrix(f,tb)
+data=list(N=nrow(X),K=ncol(X),y=tb$y,X=X)
+
+mdl=cmdstan_model('./ex6-2.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc,exc='z1',ch=F)
+
+y1=mcmc$draws('y1')
+smy=summary(y1)
+
+table(tb$y,smy$median)
+cat('\n')
+table(tb$y,smy$median,tb$c)
+
+par(mfrow=c(1,2))
+hist(tb$y-smy$median,xlab='obs.-prd.',main='residual')
+density(tb$y-smy$median) |> plot(xlab='obs.-prd.',main='residual')
+
+map=c()
+for(i in 1:n){
+  a=table(y1[,,i])
+  map[i]=as.integer(names(a[a==max(a)]))
+}
+table(tb$y,map)
+cat('\n')
+table(tb$y,map,tb$c)
+
+par(mfrow=c(1,2))
+hist(tb$y-map,xlab='obs.-map',main='residual')
+density(tb$y-map) |> plot(xlab='obs.-map',main='residual')
+```
+
+
+### multi logistic regression  
+```
+# of samples is N,  
+# of trials of a sample i is mi,  
+objective variable [0,n], integer  
+  
+probability of incident pi[0,1]  
+logit pi=log(pi/ 1-pi)=sum(bj*xji),j=[0,K],i=[1,N] (-Infinity, Infinity)  
+
+yi~B(mi, pi), # of acutual incident  
+
+odds(x)=p(x)/ 1-p(x), probablity of incident / probablity of no incident  
+odds ratio(x0,x1)=odds(x1)/odd(x0)  
+  
+when xj -> xj +1, odds ratio -> odds ratio *exp bj  
+```
+
+### ex6-3.stan
+multi logistic regression 
+```
+data{
+  int N;
+  int K;
+  array[N] int m;
+  array[N] int y;
+  matrix[N,K] X;
+}
+parameters{
+  vector[K] b;
+}
+model{
+  vector[N] z=X*b;
+  y~binomial_logit(m,z);
+}
+generated quantities{
+  array[N] int y1;
+  vector[N] z1=X*b;
+  for(i in 1:N){
+    y1[i]=binomial_rng(m[i],inv_logit(z1[i]));
+  }
+}
+```
+
+```{r}
+n=30
+m=floor(runif(n,1,10)) # trials are varying (1,10)
+x=runif(n,-1,1)
+c=sample(c('a','b'),n,replace=T)
+z=x+(c=='b')
+y=rbinom(n,m,1/(1+exp(-z)))
+tb=tibble(x=x,c=c,y=y)
+
+f=formula(y~x+c)
+qplot(data=tb,x,y,col=c)
+
+X=model.matrix(f,tb)
+data=list(N=nrow(X),K=ncol(X),y=tb$y,X=X,m=m)
+
+mdl=cmdstan_model('./ex6-3.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc,exc='z1',ch=F)
+
+y1=mcmc$draws('y1')
+smy=summary(y1)
+
+table(tb$y,smy$median)
+cat('\n')
+table(tb$y,smy$median,tb$c)
+
+par(mfrow=c(1,2))
+hist(tb$y-smy$median,xlab='obs.-prd.',main='residual')
+density(tb$y-smy$median) |> plot(xlab='obs.-prd.',main='residual')
+
+map=c()
+for(i in 1:n){
+  a=table(y1[,,i])
+  map[i]=as.integer(names(a[a==max(a)]))
+}
+table(tb$y,map)
+cat('\n')
+table(tb$y,map,tb$c)
+
+par(mfrow=c(1,2))
+hist(tb$y-map,xlab='obs.-map',main='residual')
+density(tb$y-map) |> plot(xlab='obs.-map',main='residual')
+```
+
+
+### gamma regression
+```
+objective variable [0,Infinity)
+
+# of samples is N,  
+log (a/li)=sum(bj*xji),j=[0,K],i=[1,N]
+li=a/exp(sum(bj*xji))
+yi~Ga(a,li)  
+```
+
+### ex6-4.stan
+gamma regression
+```
+data{
+  int N;
+  int K;
+  vector[N] y;
+  matrix[N,K] X;
+}
+parameters{
+  vector[K] b;
+  real<lower=0> a;
+}
+model{
+  vector[N] l;
+  for(i in 1:N){
+    l[i]=a/exp(X[i]*b);
+  }
+  y~gamma(a,l);
+}
+```
+
+```{r}
+n=20
+tb=tibble(x1=runif(n,0,2),x2=runif(n,0,2),
+          y=rgamma(n,3,3/exp(x1+x2)))
+
+f=formula(y~x1+x2)
+par(mfrow=c(1,2))
+plot(tb$x1,tb$y)
+plot(tb$x2,tb$y)
+
+X=model.matrix(f,tb)
+data=list(N=nrow(X),K=ncol(X),y=tb$y,X=X)
+
+mdl=cmdstan_model('./ex6-4.stan')
+
+mle=mdl$optimize(data=data)  # it sometimes occur error and stop process
+mle
+
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc,ch=F)
+```
+
+
+### negative binomial regression
+```
+The event with probability p do not occur y times till the event occur a times  
+(negative binomial distribution has larger variance than poisson distribution)
+
+y~NB(a,p), log(p)=X*b
+
+y~NB(a,l0/(1+l0)) when y~Po(l), l~Ga(a,l0), l0=a/E[l]
+```
+
+### ex6-5.stan
+negative binomial regression
+```
+data{
+  int N;
+  int K;
+  array[N] int y;
+  matrix[N,K] X;
+}
+parameters{
+  vector[K] b;
+  real<lower=0> a;
+}
+model{
+  a~cauchy(0,5);
+  y~neg_binomial_2_log(X*b,a);
+}
+```
+
+```{r}
+n=20
+tb=tibble(x1=runif(n,-1,0),x2=runif(n,-1,0),
+          y=rnbinom(n,3,exp(x1+x2)))
+f=formula(y~x1+x2)
+par(mfrow=c(1,2))
+plot(tb$x1,tb$y)
+plot(tb$x2,tb$y)
+
+X=model.matrix(f,tb)
+
+data=list(N=nrow(X),K=ncol(X),y=tb$y,X=X)
+
+mdl=cmdstan_model('./ex6-5.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc,ch=F)
+```
+
+
+
+### beta regression
+```
+using prior of binomial distribution parameter p[0,1]
+y~B(n,p), p~beta(a,b)
+
+m=E[p]=a/(a+b)
+s^2=V[P]=ab/(a+b)^2/(a+b+1)
+
+m=x*be
+a=ms=inv_logit(m)*s
+b=(1-m)s=(1-inv_logy(m))*s
+```
+
+### ex6-6.stan
+beta regression
+```
+data{
+  int N;
+  int K;
+  vector[N] p;
+  matrix[N,K] X;
+}
+parameters{
+  vector[K] be;
+  real<lower=0> s;
+}
+model{
+  vector[N] a;
+  vector[N] b;
+  for(i in 1:N){
+    a[i]=inv_logit(X[i]*be)*s;
+    b[i]=(1-inv_logit(X[i]*be))*s;
+  }
+  p~beta(a,b);
+}
+```
+
+```{r}
+n=20
+tb=tibble(x1=runif(n,0,0.5),x2=runif(n,0,0.5),
+          p=rbeta(n,(x1+x2)*3,(1-(x1+x2))*3))
+f=formula(p~x1+x2)
+par(mfrow=c(1,2))
+plot(tb$x1,tb$p)
+plot(tb$x2,tb$p)
+
+X=model.matrix(f,tb)
+
+data=list(N=nrow(X),K=ncol(X),p=tb$p,X=X)
+
+mdl=cmdstan_model('./ex6-6.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc,ch=F)
+```
+
+
+### beta binomial regression
+```
+fitting to distribution has larger variance than binomial distribution
+y~betaB(n,a,b) when y~B(n,p), p~beta(a,b)
+
+m=E[p]=a/(a+b)
+s^2=V[P]=ab/(a+b)^2/(a+b+1)
+
+m=x*be
+a=ms=inv_logit(m)*s
+b=(1-m)s=(1-inv_logy(m))*s
+```
+### ex6-7.stan
+beta binomial regression
+```
+data{
+  int N;
+  int K;
+  array[N] int y;
+  array[N] int n;
+  matrix[N,K] X;
+}
+parameters{
+  vector[K] be;
+  real<lower=0> s;
+}
+model{
+  vector[N] a;
+  vector[N] b;
+  for(i in 1:N){
+    a[i]=inv_logit(X[i]*be)*s;
+    b[i]=(1-inv_logit(X[i]*be))*s;
+  }
+  y~beta_binomial(n,a,b);
+  s~cauchy(0,5);
+}
+```
+
+```{r}
+n=20
+tb=tibble(x1=runif(n,0,0.5),x2=runif(n,0,0.5),
+          p=rbeta(n,(x1+x2)*3,(1-(x1+x2))*3),
+          n1=floor(runif(n,5,9)),
+          y=rbinom(n,n1,p))
+f=formula(p~x1+x2)
+par(mfrow=c(1,2))
+plot(tb$x1,tb$y)
+plot(tb$x2,tb$y)
+
+X=model.matrix(f,tb)
+
+data=list(N=nrow(X),K=ncol(X),n=tb$n1,y=tb$y,X=X)
+
+mdl=cmdstan_model('./ex6-7.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc,ch=F)
+```
