@@ -155,7 +155,6 @@ generated quantities{
 }
 ```
 
-
 ### ex9.stan
 normal regression with explanatory variable's noise
 ```
@@ -252,7 +251,6 @@ qplot(x,y,col=I('red'))+
 
 
 
-
 ## outlier
 
 ### ex10.stan
@@ -311,9 +309,79 @@ fn(mdl,data)
 
 
 ## censored data
+
+#### objective variable has NA
+```
+(x,y) i=1-N
+(x0,y0) i=1-N0
+x1 i=1-N1, y1=NA
+(x,y)~N((mx,my),(sx2,sy2,sxy))
+(x0,y0)~N((mx,my),(sx2,sy2,sxy))
+x1~N(mx,sx2)
+```
+
+### ex11-0.stan
+```
+data{
+  int N0;
+  array[N0] vector[2] xy;
+  int N1;
+  vector[N1] x1;
+}
+parameters{
+  vector[2] m;
+  cov_matrix[2] s;
+}
+model{
+  target+=multi_normal_lpdf(xy | m, s);
+  x1~normal(m[1],s[1,1]^.5);
+}
+generated quantities{
+  vector[2] xy1;
+  xy1=multi_normal_rng(m,s);
+  real cr;
+  cr=s[1,2]/(s[1,1]*s[2,2])^.5;
+}
+```
+
+```{r}
+n=30
+x=runif(n,0,9)
+y=rnorm(n,10+3*x,4)
+cor(x,y)
+qplot(x,y)
+
+L=4
+n0=sum(x>L)
+x0=x[x>L]
+y0=y[x>L]
+x1=x[x<=L]
+n1=sum(x<=L)
+cor(x0,y0)
+qplot(x0,y0)
+```
+
+```{r}
+mdl=cmdstan_model('./ex11-0.stan') 
+
+data=list(N0=n0,xy=matrix(c(x0,y0),ncol=2),N1=n1,x1=x1)
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+seeMCMC(mcmc,ch=F)
+
+xy=mcmc$draws('xy1')
+cor(xy[,,1],xy[,,2])
+qplot(xy[,,1],xy[,,2])
+```
+
+
+#### objective variable is censored
 ```
 y i=1-N, y~N(m,s)  
-  acutualy        ya i=1-Na
+  actual          ya i=1-Na
   lower censored  yl i=1-Nl, y<L, P(y<L)=cdf(L-m /s)
   upper censored  yu i=1-Nu, y>U, P(y>U)=ccdf(U-m /s)
 
@@ -322,8 +390,8 @@ ccdf(z) complementary CDF, P([z,Infinity),z~N(0,1))
 
 P(y | x,m,s)=P(ya i=1-Na)* P(yl i=1-Nl)* P(yu i=1-Nu)
 ```
-### ex11.stan
-objective variable is censored
+
+### ex11-1.stan
 ```
 data{
   int N;
@@ -390,8 +458,9 @@ x1=seq(min(x),max(x),length.out=n1) # new data fpr predcition
 
 
 ```{r}
+mdl=cmdstan_model('./ex8-0.stan')
+
 data=list(N=n,x=xya$x,y=xya$y,N1=n1,x1=x1)
-mdl=cmdstan_model('./ex8-0.stan') 
 
 mle=mdl$optimize(data=data)
 mle
@@ -430,7 +499,7 @@ data=list(N=n,x=xya$x,y=xya$y,
           L=L,Nl=nl,xl=xyl$x,
           U=U,Nu=nu,xu=xyu$x,
           N1=n1,x1=x1)
-mdl=cmdstan_model('./ex11.stan') 
+mdl=cmdstan_model('./ex11-1.stan') 
 
 mle=mdl$optimize(data=data)
 mle
@@ -507,46 +576,24 @@ mdl=cmdstan_model('./ex14.stan')
 mle=mdl$optimize(data=data)
 mle
 
-system.time({
-  mcmc=goMCMC(mdl,data)
-  seeMCMC(mcmc,ch=F)
-})
+mcmc=goMCMC(mdl,data)
+seeMCMC(mcmc,ch=F)
 ```
 
 
 
-## appendix: bimodal distribution, mixed normal distribution
-stan
-```
-data {
-  int<lower=0> N;
-  real y[N];
-}
-parameters {
-  real<lower=0, upper=1> theta; //ratio of mix
-  real mu1;
-  real mu2;
-  real<lower=0> sigma1;
-  real<lower=0> sigma2;
-}
-model {
-  for (n in 1:N) {
-    target += log_mix(theta,
-                      normal_lpdf(y[n] | mu1, sigma1),
-                      normal_lpdf(y[n] | mu2, sigma2));
-  }
-}
-```
+## bimodal distribution, mixed normal distribution
 
-EM algorithm
 ```{r}
-y0=rnorm(100,0,1)
-y1=rnorm(100,-5,1)
-y2=rnorm(100,5,1)
-y=sample(c(y0,y1,y2),100)
+n=100
+y0=rnorm(n,0,1)
+y1=rnorm(n,-5,1)
+y2=rnorm(n,5,1)
+y=sample(c(y0,y1,y2),n)
 density(y) |> plot()
 ```
 
+EM algorithm
 ```{r}
 library(mclust)
 
@@ -555,4 +602,45 @@ summary(rst)
 rst$parameters
 plot(rst)
 ```
+
+### ex16-1.stan
+```
+data {
+  int N;
+  vector[N] y;;
+}
+parameters {
+  simplex[3] h; //ratio of mix
+  real m1;
+  real m2;
+  real m3;
+  real<lower=0> s1;
+  real<lower=0> s2;
+  real<lower=0> s3;
+}
+model {
+  s1~cauchy(0,5);
+  s2~cauchy(0,5);
+  s3~cauchy(0,5);
+  for (i in 1:N) {
+    vector[3] p;
+    p[1]=log(h[1]) + normal_lpdf(y[i] | m1, s1);
+    p[2]=log(h[2]) + normal_lpdf(y[i] | m2, s2);
+    p[3]=log(h[3]) + normal_lpdf(y[i] | m3, s3);
+    target+=log_sum_exp(p);
+  }
+}
+```
+
+```{r}
+mdl=cmdstan_model('./ex16-1.stan')
+
+data=list(N=n,y=y)
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data,smp=2000)
+seeMCMC(mcmc,ch=F)
+```
+
 
