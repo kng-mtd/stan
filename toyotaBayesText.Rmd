@@ -5,7 +5,7 @@ output:
     toc: true
     toc_depth: 3
     toc_float: true
-    code_folding: hide 
+    code_folding: show 
 #date: "`r Sys.Date()`"
 
 ---
@@ -39,6 +39,10 @@ options(cmdstanr_max_rows=50)
 
 mode=function(x) {
   as.numeric(names(which.max(table(x))))
+}
+
+qtile=function(x) {
+  quantile(x,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
 }
 ```
 
@@ -125,26 +129,24 @@ c=85
 
 m=mcmc$draws('m') |> as.vector()
 mode(round(m))
-quantile(m,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(m)
 sum(m<c)/length(m)
 
 s=mcmc$draws('s') |> as.vector()
 mode(round(s))
-quantile(s,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-
-quantile(s/m,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(s)
+qtile(s/m)
 
 mode(round((m-c)/s))
-quantile((m-c)/s,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile((m-c)/s)
 
 y1=mcmc$draws('y1') |> as.vector()
 density(y1) |> plot(main='y1')
 mode(round(y1))
-quantile(y1,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(y1)
 
 sum(y1<c)/length(y1)
-
-quantile(y1/c,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(y1/c)
 ```
 
 
@@ -172,27 +174,24 @@ c=50
 
 m=mcmc$draws('m') |> as.vector()
 mode(round(m))
-quantile(m,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(m)
 sum(m<c)/length(m)
 
 s=mcmc$draws('s') |> as.vector()
 mode(round(s))
-quantile(s,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-
-quantile(s/m,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(s)
+qtile(s/m)
 
 mode(round((m-c)/s))
-quantile((m-c)/s,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile((m-c)/s)
 
 y1=mcmc$draws('y1') |> as.vector()
 density(y1) |> plot(main='y1')
 mode(round(y1))
-quantile(y1,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(y1)
 
 sum(y1<c)/length(y1)
-
-quantile(y1/c,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-
+qtile(y1/c)
 ```
 
 
@@ -234,35 +233,34 @@ s2=mcmc2$draws('s') |> as.vector()
 y12=mcmc2$draws('y1') |> as.vector()
 
 
-quantile(m1-m2,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(m1-m2)
 
 sum(m1>m2)/length(m1)
 sum(m1-m2>3)/length(m1)
 sum(m1-m2>5)/length(m1)
 sum(m1-m2>10)/length(m1)
 
-quantile((m1-m2)/s1,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile((m1-m2)/s1)
 c=0.3
 sum((m1-m2)/s1>c)/length(m1)
 
-u=pnorm(m1,m2,s2) ##cohen's U3, third measure of non-overlap
-quantile(u,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+u=pnorm(m1,m2,s2) #cohen's U3, third measure of non-overlap
+qtile(u)
 
-pd=pnorm((m1-m2)/s1/2^.5,0,1)
-quantile(pd,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1)) #probability of dominance
+pd=pnorm((m1-m2)/s1/2^.5,0,1) #probability of dominance
+qtile(pd) 
 
 c=3
-pc=pnorm((m1-m2-c)/s1/2^.5,0,1)
-quantile(pc,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1)) #probability beyond threshold
-
+pc=pnorm((m1-m2-c)/s1/2^.5,0,1) #probability beyond threshold
+qtile(pc)
 
 density(y11) |> plot(main='y1')
 mode(round(y11))
-quantile(y11,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(y11)
 
 density(y12) |> plot(main='y2')
 mode(round(y12))
-quantile(y12,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(y12)
 ```
 
 
@@ -307,32 +305,31 @@ s2=mcmc2$draws('s') |> as.vector()
 y12=mcmc2$draws('y1') |> as.vector()
 
 
-quantile(m1-m2,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(m1-m2)
 c=15
 sum(m1-m2>c)/length(m1)
 
-quantile((m1-m2)/s1,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile((m1-m2)/s1)
 c=3
 sum((m1-m2)/s1>c)/length(m1)
 
-u=pnorm(m1,m2,s2) ##cohen's U3, third measure of non-overlap
-quantile(u,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+u=pnorm(m1,m2,s2) #cohen's U3, third measure of non-overlap
+qtile(u)
 
-pd=pnorm((m1-m2)/s1/2^.5,0,1)
-quantile(pd,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1)) #probability of dominance
+pd=pnorm((m1-m2)/s1/2^.5,0,1) #probability of dominance
+qtile(pd)
 
 c=15
-pc=pnorm((m1-m2-c)/s1/2^.5,0,1)
-quantile(pc,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1)) #probability beyond threshold
-
+pc=pnorm((m1-m2-c)/s1/2^.5,0,1) #probability beyond threshold
+qtile(pc)
 
 density(y11) |> plot(main='y1')
 mode(round(y11))
-quantile(y11,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(y11)
 
 density(y12) |> plot(main='y2')
 mode(round(y12))
-quantile(y12,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(y12)
 ```
 
 
@@ -393,62 +390,61 @@ y12=mcmc$draws('y1[2]') |> as.vector()
 
 
 sum(m1>m2)/length(m1)
-quantile(m1-m2,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(m1-m2)
 c=2
 sum(m1-m2>c)/length(m1)
 
-quantile((m1-m2)/s1,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile((m1-m2)/s1)
 c=0.3
 sum((m1-m2)/s1>c)/length(m1)
 
-u=pnorm(m1,m2,s2) ##cohen's U3, third measure of non-overlap
-quantile(u,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+u=pnorm(m1,m2,s2)
+qtile(u)
 c=0.6
 sum(u>c)/length(u)
 
 pd=pnorm((m1-m2)/s1/2^.5,0,1)
-quantile(pd,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1)) #probability of dominance
+qtile(pd)
 
 c=1
 pc=pnorm((m1-m2-c)/s1/2^.5,0,1)
-quantile(pc,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1)) #probability beyond threshold
-
+qtile(pc)
 
 density(y11) |> plot(main='y1')
 mode(round(y11))
-quantile(y11,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(y11)
 
 density(y12) |> plot(main='y2')
 mode(round(y12))
-quantile(y12,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-
+qtile(y12)
 
 d=y1-y2
-quantile(d,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(d)
 
 s12=(s1^2+s2^2-2*r*s1*s2)^.5
-quantile(s12,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(s12)
 c=3
 sum(s12<c)/length(s12)
 
-quantile((m1-m2)/s12,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile((m1-m2)/s12)
 c=0.3
 sum((m1-m2)/s12>0.3)/length(m1)
 
 pd=pnorm((m1-m2)/s12,0,1)
-quantile(pd,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1)) #probability of dominance
+qtile(pd)
+
 c=0.8
 sum(pd>c)/length(pd)
 
 c=3
 pc=pnorm((m1-m2-c)/s12,0,1)
-quantile(pc,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1)) #probability beyond threshold
+qtile(pc)
 
-quantile(r,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(r)
 sum(r>0.6 & r<0.8)/length(r)
 
 pco=0.5+asin(r)/pi
-quantile(pco,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1)) #probability of concordance
+qtile(pco)
 sum(pco>0.8)/length(pco)
 ```
 
@@ -487,62 +483,60 @@ y12=mcmc$draws('y1[2]') |> as.vector()
 
 
 sum(m1>m2)/length(m1)
-quantile(m1-m2,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(m1-m2)
 c=20
 sum(m1-m2>c)/length(m1)
 
-quantile((m1-m2)/s1,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile((m1-m2)/s1)
 c=1.5
 sum((m1-m2)/s1>c)/length(m1)
 
-u=pnorm(m1,m2,s2) ##cohen's U3, third measure of non-overlap
-quantile(u,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+u=pnorm(m1,m2,s2)
+qtile(u)
 c=0.8
 sum(u>c)/length(u)
 
 pd=pnorm((m1-m2)/s1/2^.5,0,1)
-quantile(pd,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1)) #probability of dominance
+qtile(pd)
 
 c=1
 pc=pnorm((m1-m2-c)/s1/2^.5,0,1)
-quantile(pc,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1)) #probability beyond threshold
-
+qtile(pc)
 
 density(y11) |> plot(main='y1')
 mode(round(y11))
-quantile(y11,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(y11)
 
 density(y12) |> plot(main='y2')
 mode(round(y12))
-quantile(y12,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-
+qtile(y12)
 
 d=y1-y2
-quantile(d,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(d)
 
 s12=(s1^2+s2^2-2*r*s1*s2)^.5
-quantile(s12,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(s12)
 c=3
 sum(s12<c)/length(s12)
 
-quantile((m1-m2)/s12,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile((m1-m2)/s12)
 c=0.3
 sum((m1-m2)/s12>0.3)/length(m1)
 
 pd=pnorm((m1-m2)/s12,0,1)
-quantile(pd,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1)) #probability of dominance
+qtile(pd)
 c=0.8
 sum(pd>c)/length(pd)
 
 c=20
 pc=pnorm((m1-m2-c)/s12,0,1)
-quantile(pc,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1)) #probability beyond threshold
+qtile(pc)
 
-quantile(r,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(r)
 sum(r>0.6)/length(r)
 
 pco=0.5+asin(r)/pi
-quantile(pco,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1)) #probability of concordance
+qtile(pco)
 sum(pco>0.7)/length(pco)
 ```
 
@@ -598,21 +592,19 @@ m=tibble(m1=mcmc$draws('m[1]') |> as.vector(),
 s=mcmc$draws('s') |> as.vector()
 
 m0=apply(m,1,mean)
-quantile(m0,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(m0)
 
 a=m-m0
-for(i in 1:k){
-  quantile(a[,k],probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-}
+for(i in 1:k) qtile(a[,k])
 
 sa=(apply(a^2,1,sum)/k)^.5
-quantile(sa,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(sa)
 
 eta2=sa^2/(sa^2+s^2) #coefficient of determination
-quantile(eta2,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(eta2)
 
 dlt=sa/s #effect size
-quantile(dlt,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(dlt)
 
 for(i in 1:(k-1)){
   for(j in (i+1):k){
@@ -647,21 +639,19 @@ m=tibble(m1=mcmc$draws('m[1]') |> as.vector(),
 s=mcmc$draws('s') |> as.vector()
 
 m0=apply(m,1,mean)
-quantile(m0,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(m0)
 
 a=m-m0
-for(i in 1:k){
-  quantile(a[,k],probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-}
+for(i in 1:k) qtile(a[,k])
 
 sa=(apply(a^2,1,sum)/k)^.5
-quantile(sa,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(sa)
 
 eta2=sa^2/(sa^2+s^2) #coefficient of determination
-quantile(eta2,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(eta2)
 
 dlt=sa/s #effect size
-quantile(dlt,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(dlt)
 
 for(i in 1:(k-1)){
   for(j in (i+1):k){
@@ -756,7 +746,7 @@ mcmc
 mcmc$summary(variables=c('m','s','ma[1]','mb[1]','mab[1,1]','ll'))
 
 m=mcmc$draws('m') |> as.vector()
-quantile(m,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(m)
 
 ma=tibble(ma1=mcmc$draws('ma[1]') |> as.vector(),
           ma2=mcmc$draws('ma[2]') |> as.vector()) |> as.matrix()
@@ -767,10 +757,10 @@ mab=tibble(mab11=mcmc$draws('mab[1,1]') |> as.vector(),
            mab21=mcmc$draws('mab[2,1]') |> as.vector(),
            mab22=mcmc$draws('mab[2,2]') |> as.vector()) |> as.matrix()
 
-quantile(m+ma[,1]+mb[,1]+mab[,'mab11'],probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-quantile(m+ma[,1]+mb[,2]+mab[,'mab12'],probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-quantile(m+ma[,2]+mb[,1]+mab[,'mab21'],probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-quantile(m+ma[,2]+mb[,2]+mab[,'mab22'],probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(m+ma[,1]+mb[,1]+mab[,'mab11'])
+qtile(m+ma[,1]+mb[,2]+mab[,'mab12'])
+qtile(m+ma[,2]+mb[,1]+mab[,'mab21'])
+qtile(m+ma[,2]+mb[,2]+mab[,'mab22'])
 
 s=mcmc$draws('s') |> as.vector()
 
@@ -780,25 +770,25 @@ sab=(apply(mab^2,1,sum)/ka/kb)^.5
 sy2=sa^2+sb^2+sab^2+s^2
 
 eta2a=sa^2/sy2 #coefficient of determination
-quantile(eta2a,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(eta2a)
 
 eta2b=sb^2/sy2 #coefficient of determination
-quantile(eta2b,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(eta2b)
 
 eta2ab=sab^2/sy2 #coefficient of determination
-quantile(eta2ab,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(eta2ab)
 
 eta2=(sa^2+sb^2+sab^2)/sy2 #coefficient of determination
-quantile(eta2,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(eta2)
 
 dlt_a=sa/s #effect size
-quantile(dlt_a,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(dlt_a)
 
 dlt_b=sb/s #effect size
-quantile(dlt_b,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(dlt_b)
 
 dlt_ab=sab/s #effect size
-quantile(dlt_ab,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(dlt_ab)
 ```
 
 
@@ -837,7 +827,7 @@ system.time({
 mcmc
 
 m=mcmc$draws('m') |> as.vector()
-quantile(m,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(m)
 
 ma=tibble(ma1=mcmc$draws('ma[1]') |> as.vector(),
           ma2=mcmc$draws('ma[2]') |> as.vector()) |> as.matrix()
@@ -860,52 +850,52 @@ mab=tibble(mab11=mcmc$draws('mab[1,1]') |> as.vector(),
            mab25=mcmc$draws('mab[2,5]') |> as.vector(),
            mab26=mcmc$draws('mab[2,6]') |> as.vector()) |> as.matrix()
 
-quantile(m+ma[,1]+mb[,1]+mab[,'mab11'],probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-quantile(m+ma[,1]+mb[,2]+mab[,'mab12'],probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-quantile(m+ma[,1]+mb[,3]+mab[,'mab13'],probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-quantile(m+ma[,1]+mb[,4]+mab[,'mab14'],probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-quantile(m+ma[,1]+mb[,5]+mab[,'mab15'],probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-quantile(m+ma[,1]+mb[,6]+mab[,'mab16'],probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-quantile(m+ma[,2]+mb[,1]+mab[,'mab21'],probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-quantile(m+ma[,2]+mb[,2]+mab[,'mab22'],probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-quantile(m+ma[,2]+mb[,3]+mab[,'mab23'],probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-quantile(m+ma[,2]+mb[,4]+mab[,'mab24'],probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-quantile(m+ma[,2]+mb[,5]+mab[,'mab25'],probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-quantile(m+ma[,2]+mb[,6]+mab[,'mab26'],probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(m+ma[,1]+mb[,1]+mab[,'mab11'])
+qtile(m+ma[,1]+mb[,2]+mab[,'mab12'])
+qtile(m+ma[,1]+mb[,3]+mab[,'mab13'])
+qtile(m+ma[,1]+mb[,4]+mab[,'mab14'])
+qtile(m+ma[,1]+mb[,5]+mab[,'mab15'])
+qtile(m+ma[,1]+mb[,6]+mab[,'mab16'])
+qtile(m+ma[,2]+mb[,1]+mab[,'mab21'])
+qtile(m+ma[,2]+mb[,2]+mab[,'mab22'])
+qtile(m+ma[,2]+mb[,3]+mab[,'mab23'])
+qtile(m+ma[,2]+mb[,4]+mab[,'mab24'])
+qtile(m+ma[,2]+mb[,5]+mab[,'mab25'])
+qtile(m+ma[,2]+mb[,6]+mab[,'mab26'])
 
 s=mcmc$draws('s') |> as.vector()
 
 sa=(apply(ma^2,1,sum)/ka)^.5
-quantile(sa,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(sa)
 
 sb=(apply(mb^2,1,sum)/kb)^.5
-quantile(sb,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(sb)
 
 sab=(apply(mab^2,1,sum)/ka/kb)^.5
-quantile(sab,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(sab)
 
 sy2=sa^2+sb^2+sab^2+s^2
 
 eta2a=sa^2/sy2 #coefficient of determination
-quantile(eta2a,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(eta2a)
 
 eta2b=sb^2/sy2 #coefficient of determination
-quantile(eta2b,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(eta2b)
 
 eta2ab=sab^2/sy2 #coefficient of determination
-quantile(eta2ab,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(eta2ab)
 
 eta2=(sa^2+sb^2+sab^2)/sy2 #coefficient of determination
-quantile(eta2,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(eta2)
 
 dlt_a=sa/s #effect size
-quantile(dlt_a,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(dlt_a)
 
 dlt_b=sb/s #effect size
-quantile(dlt_b,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(dlt_b)
 
 dlt_ab=sab/s #effect size
-quantile(dlt_ab,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(dlt_ab)
 ```
 
 
@@ -955,7 +945,7 @@ p=mcmc$draws('p') |> as.vector()
 sum(p>0.5)/length(p)
 
 od=p/(1-p) #odds
-quantile(od,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(od)
 ```
 
 ```{r}
@@ -989,16 +979,16 @@ system.time({
 p1=mcmc1$draws('p') |> as.vector()
 sum(p1>0.5)/length(p1)
 od1=p1/(1-p1) #odds
-quantile(od1,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(od1)
 
 p2=mcmc2$draws('p') |> as.vector()
 sum(p2>0.5)/length(p2)
 od2=p2/(1-p2) #odds
-quantile(od2,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(od2)
 
-quantile(p1-p2,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-quantile(p1/p2,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-quantile(od1/od2,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(p1-p2)
+qtile(p1/p2)
+qtile(od1/od2)
 ```
 
 
@@ -1103,13 +1093,13 @@ e21=(p21-p20*p01)/(p20*p01)^.5
 e12=(p12-p10*p02)/(p10*p02)^.5
 e22=(p22-p20*p02)/(p20*p02)^.5
 
-quantile(e11,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-quantile(e21,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-quantile(e12,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-quantile(e22,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(e11)
+qtile(e21)
+qtile(e12)
+qtile(e22)
 
 v=((e11^2+e21^2+e12^2+e22^2)/(min(r,c)-1))^.5 # Cramer's V
-quantile(v,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(v)
 ```
 
 
@@ -1149,12 +1139,12 @@ p01=p11+p21+p31
 p02=p12+p22+p32
 p03=p13+p23+p33
 
-quantile(p10,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-quantile(p20,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-quantile(p30,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-quantile(p01,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-quantile(p02,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
-quantile(p03,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(p10)
+qtile(p20)
+qtile(p30)
+qtile(p01)
+qtile(p02)
+qtile(p03)
 
 e11=(p11-p10*p01)/(p10*p01)^.5 # Peason's residual
 e21=(p21-p20*p01)/(p20*p01)^.5
@@ -1167,6 +1157,6 @@ e23=(p23-p20*p03)/(p20*p03)^.5
 e33=(p33-p30*p03)/(p30*p03)^.5
 
 v=((e11^2+e21^2+e31^2+e12^2+e22^2+e32^2+e13^2+e23^2+e33^2)/(min(r,c)-1))^.5 # Cramer's V
-quantile(v,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1))
+qtile(v)
 ```
 
