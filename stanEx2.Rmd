@@ -64,11 +64,12 @@ seeMCMC=function(mcmc,exc='',ch=T){ # exclude 'exc' parameters from seeing
     if(exc!='' && grepl(paste0('^',exc),pr)) next
     drw=mcmc$draws(pr)
     if(ch){
-      par(mfrow=c(1,4))
-      drw[,1,] |> plot(type='l',main='chain1',ylab=pr)
-      drw[,2,] |> plot(type='l',main='chain2',ylab=pr)
-      drw[,3,] |> plot(type='l',main='chain3',ylab=pr)
-      drw[,4,] |> plot(type='l',main='chain4',ylab=pr)
+      par(mfrow=c(4,1),mar=c(1,5,1,1))
+      drw[,1,] |> plot(type='l',xlab='',ylab=pr)
+      drw[,2,] |> plot(type='l',xlab='',ylab=pr)
+      drw[,3,] |> plot(type='l',xlab='',ylab=pr)
+      drw[,4,] |> plot(type='l',xlab='',ylab=pr)
+      par(mar=c(3,5,3,3))
     }
 
     par(mfrow=c(1,2))

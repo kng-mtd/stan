@@ -63,11 +63,12 @@ seeMCMC=function(mcmc,exc='',ch=T){ # exclude 'exc' parameters from seeing
     if(exc!='' && grepl(paste0('^',exc),pr)) next
     drw=mcmc$draws(pr)
     if(ch){
-      par(mfrow=c(1,4))
-      drw[,1,] |> plot(type='l',main='chain1',ylab=pr)
-      drw[,2,] |> plot(type='l',main='chain2',ylab=pr)
-      drw[,3,] |> plot(type='l',main='chain3',ylab=pr)
-      drw[,4,] |> plot(type='l',main='chain4',ylab=pr)
+      par(mfrow=c(4,1),mar=c(1,5,1,1))
+      drw[,1,] |> plot(type='l',xlab='',ylab=pr)
+      drw[,2,] |> plot(type='l',xlab='',ylab=pr)
+      drw[,3,] |> plot(type='l',xlab='',ylab=pr)
+      drw[,4,] |> plot(type='l',xlab='',ylab=pr)
+      par(mar=c(3,5,3,3))
     }
 
     par(mfrow=c(1,2))
@@ -82,26 +83,28 @@ seeMCMC=function(mcmc,exc='',ch=T){ # exclude 'exc' parameters from seeing
 
 ## normal distribution
 
-### ex1.stan
+### ex1-0.stan
 normal distribution
 ```
 data{
   int N;
   vector[N] y;
 }
-
 parameters{
   real m;
   real<lower=0> s;
 }
-
 model{
   y~normal(m,s);
+}
+generated quantities{
+  real y1;
+  y1=normal_rng(m,s);
 }
 ```
 
 ```{r}
-mdl=cmdstan_model('./ex1.stan')
+mdl=cmdstan_model('./ex1-0.stan')
 y=rnorm(10,2,1)
 summary(y)
 par(mfrow=c(1,2))
@@ -153,9 +156,8 @@ model{
 }
 
 generated quantities{
-  vector[N] y1;
-  for(i in 1:N)
-    y1[i]=normal_rng(m,s);
+  real y1;
+  y1=normal_rng(m,s);
 }
 ```
 
@@ -194,9 +196,8 @@ model{
 }
 
 generated quantities{
-  array[N] int y1;
-  for(i in 1:N)
-    y1[i]=poisson_rng(l);
+  int y1;
+  y1=poisson_rng(l);
 }
 ```
 
@@ -320,7 +321,7 @@ plot(xy)
 
 
 ### ex4-2.stan
-single normal regression, prediction from new explanatory variable
+single normal regression, prediction from new explanatory variable x1
 ```
 data{
   int N;
@@ -409,7 +410,7 @@ qplot(x,y,col=I('red'))+
 
 
 ### ex4-3.stan
-single normal regression, prediction from original explanatory variable
+single normal regression, prediction from original explanatory variable x
 ```
 data{
   int N;
@@ -639,7 +640,7 @@ distribution of mean, it's from central limit theorem
 y~N(m,s), y(-Inf,Inf), E[y]=m, V[y]=s^2
 ```
 
-### ex1.stan
+### ex1-0.stan
 ```
 data{
   int N;
@@ -652,18 +653,23 @@ parameters{
 model{
   y~normal(m,s);
 }
+generated quantities{
+  real y1;
+  y1=normal_rng(m,s);
+}
 ```
 
 ```{r}
-y=rnorm(10,2,1)
+n=20
+y=rnorm(n,2,1)
 summary(y)
 par(mfrow=c(1,2))
 hist(y,main='y')
 density(y) |> plot(main='y')
 
-data=list(N=length(y),y=y)
+data=list(N=n,y=y)
 
-mdl=cmdstan_model('./ex1.stan')
+mdl=cmdstan_model('./ex1-0.stan')
 
 mle=mdl$optimize(data=data)
 mle
@@ -679,7 +685,7 @@ seeMCMC(mcmc)
 The event with probablity p occur y=1, not occur y=0 
 y~Ber(p), y{0,1}, E[y]=p, V[y]=p(1-p)
 ```
-### ex0-0.stan
+### ex1-1.stan
 ```
 data{
   int N;
@@ -689,15 +695,25 @@ parameters{
   real<lower=0,upper=1> p;
 }
 model{
-  p~beta(1,1);
   y~bernoulli(p);
+}
+generated quantities{
+  real s;
+  s=(p*(1-p))^.5;
 }
 ```
 
 ```{r}
-data=list(N=9,y=sample(0:1,9,replace=T))
+n=10
+y=sample(0:1,n,replace=T)
+summary(y)
+par(mfrow=c(1,2))
+hist(y,main='y')
+density(y) |> plot(main='y')
 
-mdl=cmdstan_model('./ex0-0.stan')
+data=list(N=n,y=y)
+
+mdl=cmdstan_model('./ex1-1.stan')
 
 mle=mdl$optimize(data=data)
 mle
@@ -708,42 +724,94 @@ seeMCMC(mcmc)
 ```
 
 
-## Poisson dist.
+## geometric dist.
 ```
-The event occur l times in unit range, the event occur y times. 
-y~Po(l), y{0,1...Inf}, E[y]=l, V[y]=l
+The event with probablity p occur after y trials(failure) 
+y~Ge(p), y[0,Inf), P(Y=y)=p(1−p)^y
+E[y]=1/p, V[y]=(1-p)/p^2
 ```
-
-### ex2-2.stan
+### ex1-2.stan
 ```
 data{
   int N;
   array[N] int y;
 }
 parameters{
-  real<lower=0> l;
+  real<lower=0,upper=1> p;
 }
 model{
-  y~poisson(l);
+  for (n in 1:N) {
+    target+=log(p)+y[n]*log(1-p);
+  }
 }
 generated quantities{
-  array[N] int y1;
-  for(i in 1:N)
-    y1[i]=poisson_rng(l);
+  real m;
+  m=1/p;
+  real s;
+  s=((1-p)/p^2)^.5;
 }
 ```
 
 ```{r}
-n=10
-y=rpois(n,3)
+n=20
+y=rgeom(n,0.3)
 summary(y)
 par(mfrow=c(1,2))
 hist(y,main='y')
 density(y) |> plot(main='y')
-
 data=list(N=n,y=y)
 
-mdl=cmdstan_model('./ex2-2.stan')
+mdl=cmdstan_model('./ex1-2.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc)
+```
+
+
+## negative binomial dist.
+```
+The event with probablity p occur a times after y-1 trials 
+y~NB(a,p), y[a,Inf), P(Y=y)=p^a*(1−p)^(y-a-1)
+E[y]=a*(1-p)/p, V[y]=a*(1-p)/p^2
+```
+### ex1-3.stan
+```
+data{
+  int N;
+  array[N] int y;
+}
+parameters{
+  real<lower=0,upper=1> p;
+  real<lower=1> a;
+}
+model{
+  y~neg_binomial(a,p);
+}
+generated quantities{
+  real m;
+  m=a*(1-p)/p;
+  real s;
+  s=(a*(1-p)/p^2)^.5;
+  int y1;
+  y1=neg_binomial_rng(a,p);
+}
+```
+
+```{r}
+n=50
+a=3
+y=rnbinom(n,a,0.3)
+summary(y)
+par(mfrow=c(1,2))
+hist(y,main='y')
+density(y) |> plot(main='y')
+data=list(N=n,y=y)
+
+mdl=cmdstan_model('./ex1-3.stan')
 
 mle=mdl$optimize(data=data)
 mle
@@ -764,7 +832,57 @@ density(y1) |> plot(main='y1')
 The event with probablity p occur y times on n trials
 y~B(n,p), y{0,1...n}, E[y]=np, V[y]=np(1-p)
 ```
+
 ### ex2-3.stan
+```
+data{
+  int N;
+  int n;
+  array[N] int y;
+}
+parameters{
+  real<lower=0,upper=0> p;
+}
+model{
+  y~binomial(n,p);
+}
+generated quantities{
+  real m;
+  m=n*p;
+  real s;
+  s=(n*p*(1-p))^.5;
+  int y1;
+  y1=binomial_rng(n,p);
+}
+```
+
+```{r}
+n=20
+n0=10
+y=rbinom(n,n0,0.3)
+summary(y)
+par(mfrow=c(1,2))
+hist(y,main='y')
+density(y) |> plot(main='y')
+data=list(N=n,n=n0,y=y)
+
+mdl=cmdstan_model('./ex2-3.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc)
+
+y1=mcmc$draws('y1')
+par(mfrow=c(1,2))
+hist(y1,main='y1')
+density(y1) |> plot(main='y1') 
+```
+
+### ex2-31.stan
+trial n is varied from each sample
 ```
 data{
   int N;
@@ -780,13 +898,13 @@ model{
 ```
 
 ```{r}
-n=10
+n=20
 n0=floor(runif(n,1,10))
 y=rbinom(n,n0,0.3)
 
 data=list(N=n,n=n0,y=y)
 
-mdl=cmdstan_model('./ex2-3.stan')
+mdl=cmdstan_model('./ex2-31.stan')
 
 mle=mdl$optimize(data=data)
 mle
@@ -797,29 +915,35 @@ seeMCMC(mcmc)
 ```
 
 
-## log normal dist.
+## Poisson dist.
 ```
-logalithm of variable follows normal distribution
-log y~N(m,s), y>0
+The event occur l times in unit range, the event occur y times. 
+y~Po(l), y{0,1...Inf}, E[y]=l, V[y]=l
 ```
-### ex2-4.stan
+
+### ex1-4.stan
 ```
 data{
   int N;
-  vector[N]<lower=0> y;
+  array[N] int y;
 }
 parameters{
-  real m;
-  real<lower=0> s;
+  real<lower=0> l;
 }
 model{
-  y~lognormal(m,s);
+  y~poisson(l);
+}
+generated quantities{
+  real s;
+  s=l^.5;
+  int y1;
+  y1=poisson_rng(l);
 }
 ```
 
 ```{r}
-n=10
-y=rlnorm(n,2,1)
+n=20
+y=rpois(n,3)
 summary(y)
 par(mfrow=c(1,2))
 hist(y,main='y')
@@ -827,7 +951,7 @@ density(y) |> plot(main='y')
 
 data=list(N=n,y=y)
 
-mdl=cmdstan_model('./ex2-4.stan')
+mdl=cmdstan_model('./ex1-4.stan')
 
 mle=mdl$optimize(data=data)
 mle
@@ -835,6 +959,11 @@ mle
 mcmc=goMCMC(mdl,data)
 
 seeMCMC(mcmc)
+
+y1=mcmc$draws('y1')
+par(mfrow=c(1,2))
+hist(y1,main='y1')
+density(y1) |> plot(main='y1') 
 ```
 
 
@@ -843,7 +972,7 @@ seeMCMC(mcmc)
 The event occur l times in unit range, the event take time y to occur
 y~ex(l), y>0, E[y]=1/l, V[y]=1/l^2
 ```
-### ex2-5.stan
+### ex1-5.stan
 ```
 data{
   int N;
@@ -855,11 +984,19 @@ parameters{
 model{
   y~exponential(l);
 }
+generated quantities{
+  real m;
+  m=1/l;
+  real s;
+  s=1/l;
+  real y1;
+  y1=exponential_rng(l);
+}
 ```
 
 ```{r}
-n=10
-y=rexp(n,1)
+n=20
+y=rexp(n,2)
 summary(y)
 par(mfrow=c(1,2))
 hist(y,main='y')
@@ -867,7 +1004,7 @@ density(y) |> plot(main='y')
 
 data=list(N=n,y=y)
 
-mdl=cmdstan_model('./ex2-5.stan')
+mdl=cmdstan_model('./ex1-5.stan')
 
 mle=mdl$optimize(data=data)
 mle
@@ -875,6 +1012,11 @@ mle
 mcmc=goMCMC(mdl,data)
 
 seeMCMC(mcmc)
+
+y1=mcmc$draws('y1')
+par(mfrow=c(1,2))
+hist(y1,main='y1')
+density(y1) |> plot(main='y1') 
 ```
 
 
@@ -883,7 +1025,7 @@ seeMCMC(mcmc)
 The event occur l times in unit range, the event take time y to occur a times
 y~Ga(a,l), y>0, E[y]=a/l, V[y]=a/l^2
 ```
-### ex2-6.stan
+### ex1-6.stan
 ```
 data{
   int N;
@@ -899,7 +1041,7 @@ model{
 ```
 
 ```{r}
-n=10
+n=20
 y=rgamma(n,2,1)
 summary(y)
 par(mfrow=c(1,2))
@@ -908,7 +1050,7 @@ density(y) |> plot(main='y')
 
 data=list(N=n,y=y)
 
-mdl=cmdstan_model('./ex2-6.stan')
+mdl=cmdstan_model('./ex1-6.stan')
 
 mle=mdl$optimize(data=data)
 mle
@@ -916,15 +1058,71 @@ mle
 mcmc=goMCMC(mdl,data)
 
 seeMCMC(mcmc)
+
+y1=mcmc$draws('y1')
+par(mfrow=c(1,2))
+hist(y1,main='y1')
+density(y1) |> plot(main='y1') 
 ```
+
+
+## log normal dist.
+```
+logalithm of variable follows normal distribution
+log y~N(m,s), y>0
+E[y]=exp(m+s^2)
+V[y]=exp(2*m+s^2)*(exp(s^2)-1)
+```
+### ex1-7.stan
+```
+data{
+  int N;
+  vector[N]<lower=0> y;
+}
+parameters{
+  real m0;
+  real<lower=0> s0;
+}
+model{
+  y~lognormal(m0,s0);
+}
+```
+
+```{r}
+n=30
+y=rlnorm(n,0.5,1)
+summary(y)
+par(mfrow=c(1,2))
+hist(y,main='y')
+density(y) |> plot(main='y')
+
+data=list(N=n,y=y)
+
+mdl=cmdstan_model('./ex1-7.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc)
+
+y1=mcmc$draws('y1')
+par(mfrow=c(1,2))
+hist(y1,main='y1')
+density(y1) |> plot(main='y1') 
+```
+
 
 
 ## beta dist.
 ```
 use as prior of binomial dist parameter p
-p~Be(a,b), p[0,1], E[p]=a/(a+b), V[p]=ab/(a+b)^2/(a+b+1)
+event with probabilty p0 occur a-1 times, do not occur b-1 times in a+b-2 trials
+p~Be(a,b), p[0,1], p=p0^(a-1)*(1-p0)^(b-1)
+E[p]=a/(a+b), V[p]=ab/(a+b)^2/(a+b+1)
 ```
-### ex2-7.stan
+### ex1-8.stan
 ```
 data{
   int N;
@@ -949,7 +1147,7 @@ density(p) |> plot(main='p')
 
 data=list(N=n,p=p)
 
-mdl=cmdstan_model('./ex2-7.stan')
+mdl=cmdstan_model('./ex1-8.stan')
 
 mle=mdl$optimize(data=data)
 mle
@@ -965,7 +1163,7 @@ seeMCMC(mcmc)
 use as prior of categorical dist parameter p
 p~dir(p0), p[0,1]
 ```
-### ex2-8.stan
+### ex1-9.stan
 ```
 data {
   int N;
@@ -991,7 +1189,7 @@ boxplot(p)
 
 data=list(N=n,K=ncol(p),p=p)
 
-mdl=cmdstan_model('./ex2-8.stan')
+mdl=cmdstan_model('./ex1-9.stan')
 
 mle=mdl$optimize(data=data)
 mle
@@ -1002,48 +1200,3 @@ seeMCMC(mcmc)
 ```
 
 
-
-###  categorical dist. with parameters following Dirichlet dist.
-```
-h~Dir(a), h[0,1], sum(h)=1, a[0,1], sum(a)=1 
-y~Cat(h), y[0,1], sum(y)=1
-```
-
-### ex2-9.stan
-```
-data {
-  int N;
-  int K;
-  array[N] int<lower=1,upper=K> y;
-}
-parameters {
-  simplex[K] a;
-  simplex[K] h;
-}
-model {
-  h~dirichlet(a);
-  y~categorical(h);
-}
-```
-
-```{r}
-library(gtools)
-n=20
-h=rdirichlet(n,c(0.5,0.3,0.2))
-summary(h)
-
-c0=c(1,2,3)
-for(i in 1:n) y[i]=sample(c0,1,prob=h[i,])
-table(y) |> prop.table()
-
-data=list(N=n,K=ncol(h),y=y)
-
-mdl=cmdstan_model('./ex2-9.stan')
-
-mle=mdl$optimize(data=data)
-mle
-
-mcmc=goMCMC(mdl,data)
-
-seeMCMC(mcmc)
-```
