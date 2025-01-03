@@ -582,6 +582,57 @@ seeMCMC(mcmc,ch=F)
 
 
 
+## 2x2 cross table 
+```
+Effect occur y=1 with probabilty p01, p11 from each cause x{0,1}
+event frequncy nxy of effect y{0,1} by cause x{0,1}
+n01~B(n0.,p01)
+n11~B(n1.,p11)
+```
+
+### ex16-1.stan
+```
+data {
+  int n0;
+  int n01;
+  int n1;
+  int n11;
+}
+parameters {
+  real<lower=0,upper=1> p01;
+  real<lower=0,upper=1> p11;
+}
+model {
+  n01~binomial(n0,p01);
+  n11~binomial(n1,p11);
+}
+generated quantities {
+  real RR;
+  RR=p11/p01;
+  real OR;
+  OR=(p11/(1-p11))/(p01/(1-p01));
+}
+```
+
+```{r}
+n0=20
+n01=rbinom(1,n0,0.3)
+n1=20
+n11=rbinom(1,n1,0.6)
+data=list(n0=n0,n01=n01,n1=n1,n11=n11)
+
+mdl=cmdstan_model('./ex16-1.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+seeMCMC(mcmc,ch=F)
+```
+
+
+
+
 ## bimodal distribution, mixed normal distribution
 
 ```{r}
@@ -603,7 +654,7 @@ rst$parameters
 plot(rst)
 ```
 
-### ex16-1.stan
+### ex17-1.stan
 ```
 data {
   int N;
@@ -633,7 +684,7 @@ model {
 ```
 
 ```{r}
-mdl=cmdstan_model('./ex16-1.stan')
+mdl=cmdstan_model('./ex17-1.stan')
 
 data=list(N=n,y=y)
 mle=mdl$optimize(data=data)
