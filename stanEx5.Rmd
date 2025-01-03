@@ -63,11 +63,12 @@ seeMCMC=function(mcmc,exc='',ch=T){ # exclude 'exc' parameters from seeing
     if(exc!='' && grepl(paste0('^',exc),pr)) next
     drw=mcmc$draws(pr)
     if(ch){
-      par(mfrow=c(1,4))
-      drw[,1,] |> plot(type='l',main='chain1',ylab=pr)
-      drw[,2,] |> plot(type='l',main='chain2',ylab=pr)
-      drw[,3,] |> plot(type='l',main='chain3',ylab=pr)
-      drw[,4,] |> plot(type='l',main='chain4',ylab=pr)
+      par(mfrow=c(4,1),mar=c(1,5,1,1))
+      drw[,1,] |> plot(type='l',xlab='',ylab=pr)
+      drw[,2,] |> plot(type='l',xlab='',ylab=pr)
+      drw[,3,] |> plot(type='l',xlab='',ylab=pr)
+      drw[,4,] |> plot(type='l',xlab='',ylab=pr)
+      par(mar=c(3,5,3,3))
     }
 
     par(mfrow=c(1,2))
@@ -517,3 +518,107 @@ qplot(x,y,size=I(2),col=I('red'))+
 
 ```
 
+
+
+##  categorical dist. with parameters following Dirichlet dist.
+```
+h~Dir(a), h[0,1], sum(h)=1, a[0,1], sum(a)=1 
+y~Cat(h), y[0,1], sum(y)=1
+```
+
+### ex15-1.stan
+```
+data {
+  int N;
+  int K;
+  array[N] int<lower=1,upper=K> y;
+}
+parameters {
+  simplex[K] a;
+  simplex[K] h;
+}
+model {
+  h~dirichlet(a);
+  y~categorical(h);
+}
+```
+
+```{r}
+library(gtools)
+n=20
+h=rdirichlet(n,c(0.5,0.3,0.2))
+summary(h)
+
+c0=c(1,2,3)
+for(i in 1:n) y[i]=sample(c0,1,prob=h[i,])
+table(y) |> prop.table()
+
+data=list(N=n,K=ncol(h),y=y)
+
+mdl=cmdstan_model('./ex15-1.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc)
+```
+
+
+
+## beta binomial dist.
+```
+y~betaB(n,a,b): y~B(n,p), p~beta(a,b)
+```
+
+### ex15-2.stan
+```
+data {
+  int N;
+  int n;
+  array[N] int y;
+}
+parameters {
+  real<lower=0> a;
+  real<lower=0> b;
+}
+model {
+  a~cauchy(0,5);
+  b~cauchy(0,5);
+  y~beta_binomial(n,a,b);
+}
+generated quantities{
+  int y1;
+  y1=beta_binomial_rng(n,a,b);
+}
+```
+
+```{r}
+n=30
+a=3
+b=4
+p=rbeta(n,a,b)
+n0=10
+y=rbinom(n,n0,p)
+summary(y)
+par(mfrow=c(1,2))
+hist(y,main='y')
+density(y) |> plot(main='y')
+
+data=list(N=n,n=n0,y=y)
+
+mdl=cmdstan_model('./ex15-2.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+
+seeMCMC(mcmc)
+
+y1=mcmc$draws('y1')
+par(mfrow=c(1,2))
+hist(y1,main='y1')
+density(y1) |> plot(main='y1')     
+```
