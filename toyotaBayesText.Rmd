@@ -37,8 +37,8 @@ options(scipen=100,digits=3)
 options(mc.cores=parallel::detectCores())
 options(cmdstanr_max_rows=50)
 
-mode=function(x) {
-  as.numeric(names(which.max(table(x))))
+mode=function(x,a=0) {
+  as.numeric(names(which.max(table(round(x,a)))))
 }
 
 qtile=function(x) {
@@ -128,21 +128,21 @@ system.time({
 c=85
 
 m=mcmc$draws('m') |> as.vector()
-mode(round(m))
+mode(m,1)
 qtile(m)
 sum(m<c)/length(m)
 
 s=mcmc$draws('s') |> as.vector()
-mode(round(s))
+mode(s,2)
 qtile(s)
 qtile(s/m)
 
-mode(round((m-c)/s))
+mode((m-c)/s,2)
 qtile((m-c)/s)
 
 y1=mcmc$draws('y1') |> as.vector()
 density(y1) |> plot(main='y1')
-mode(round(y1))
+mode(y1,2)
 qtile(y1)
 
 sum(y1<c)/length(y1)
@@ -173,21 +173,21 @@ system.time({
 c=50
 
 m=mcmc$draws('m') |> as.vector()
-mode(round(m))
+mode(m)
 qtile(m)
 sum(m<c)/length(m)
 
 s=mcmc$draws('s') |> as.vector()
-mode(round(s))
+mode(s,2)
 qtile(s)
 qtile(s/m)
 
-mode(round((m-c)/s))
+mode((m-c)/s,2)
 qtile((m-c)/s)
 
 y1=mcmc$draws('y1') |> as.vector()
 density(y1) |> plot(main='y1')
-mode(round(y1))
+mode(y1)
 qtile(y1)
 
 sum(y1<c)/length(y1)
@@ -255,11 +255,11 @@ pc=pnorm((m1-m2-c)/s1/2^.5,0,1) #probability beyond threshold
 qtile(pc)
 
 density(y11) |> plot(main='y1')
-mode(round(y11))
+mode(y11)
 qtile(y11)
 
 density(y12) |> plot(main='y2')
-mode(round(y12))
+mode(y12)
 qtile(y12)
 ```
 
@@ -324,11 +324,11 @@ pc=pnorm((m1-m2-c)/s1/2^.5,0,1) #probability beyond threshold
 qtile(pc)
 
 density(y11) |> plot(main='y1')
-mode(round(y11))
+mode(y11)
 qtile(y11)
 
 density(y12) |> plot(main='y2')
-mode(round(y12))
+mode(y12)
 qtile(y12)
 ```
 
@@ -411,11 +411,11 @@ pc=pnorm((m1-m2-c)/s1/2^.5,0,1)
 qtile(pc)
 
 density(y11) |> plot(main='y1')
-mode(round(y11))
+mode(y11,1)
 qtile(y11)
 
 density(y12) |> plot(main='y2')
-mode(round(y12))
+mode(y12,1)
 qtile(y12)
 
 d=y1-y2
@@ -504,11 +504,11 @@ pc=pnorm((m1-m2-c)/s1/2^.5,0,1)
 qtile(pc)
 
 density(y11) |> plot(main='y1')
-mode(round(y11))
+mode(y11)
 qtile(y11)
 
 density(y12) |> plot(main='y2')
-mode(round(y12))
+mode(y12)
 qtile(y12)
 
 d=y1-y2
