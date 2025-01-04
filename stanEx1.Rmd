@@ -774,8 +774,8 @@ seeMCMC(mcmc)
 
 ## negative binomial dist.
 ```
-The event with probablity p occur a times after y-1 trials 
-y~NB(a,p), y[a,Inf), P(Y=y)=p^a*(1−p)^(y-a-1)
+The event with probablity p occur a times after y-a trials 
+y~NB(a,p), y[a,Inf), P(Y=y)=p^a*(1−p)^(y-a)
 E[y]=a*(1-p)/p, V[y]=a*(1-p)/p^2
 ```
 ### ex1-3.stan
