@@ -55,7 +55,7 @@ goMCMC=function(mdl,data,smp=500,wrm=100,th=1){
 
 see mcmc result and parameters
 ```{r}
-seeMCMC=function(mcmc,exc='',ch=T){ # exclude 'exc' parameters from seeing
+seeMCMC=function(mcmc,exc='',ch=T){ # not see parameters str1..., str2,... using regex as exc='[str1,str2,...]' 
   print(mcmc)
   prs=mcmc$metadata()$model_params[-1] # reject lp__
   for(pr in prs){
@@ -622,3 +622,67 @@ par(mfrow=c(1,2))
 hist(y1,main='y1')
 density(y1) |> plot(main='y1')     
 ```
+
+
+
+## bimodal distribution, mixed normal distribution
+
+```{r}
+n=100
+y0=rnorm(n,0,1)
+y1=rnorm(n,-5,1)
+y2=rnorm(n,5,1)
+y=sample(c(y0,y1,y2),n)
+density(y) |> plot()
+```
+
+EM algorithm
+```{r}
+library(mclust)
+
+rst=Mclust(y)
+summary(rst)
+rst$parameters
+plot(rst)
+```
+
+### ex17-1.stan
+```
+data {
+  int N;
+  vector[N] y;;
+}
+parameters {
+  simplex[3] h; //ratio of mix
+  real m1;
+  real m2;
+  real m3;
+  real<lower=0> s1;
+  real<lower=0> s2;
+  real<lower=0> s3;
+}
+model {
+  s1~cauchy(0,5);
+  s2~cauchy(0,5);
+  s3~cauchy(0,5);
+  for (i in 1:N) {
+    vector[3] p;
+    p[1]=log(h[1]) + normal_lpdf(y[i] | m1, s1);
+    p[2]=log(h[2]) + normal_lpdf(y[i] | m2, s2);
+    p[3]=log(h[3]) + normal_lpdf(y[i] | m3, s3);
+    target+=log_sum_exp(p);
+  }
+}
+```
+
+```{r}
+mdl=cmdstan_model('./ex17-1.stan')
+
+data=list(N=n,y=y)
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data,smp=2000)
+seeMCMC(mcmc,ch=F)
+```
+
