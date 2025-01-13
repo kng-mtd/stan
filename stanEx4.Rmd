@@ -55,7 +55,7 @@ goMCMC=function(mdl,data,smp=500,wrm=100,th=1){
 
 see mcmc result and parameters
 ```{r}
-seeMCMC=function(mcmc,exc='',ch=T){ # exclude 'exc' parameters from seeing
+seeMCMC=function(mcmc,exc='',ch=T){ # not see parameters str1..., str2,... using regex as exc='[str1,str2,...]' 
   print(mcmc)
   prs=mcmc$metadata()$model_params[-1] # reject lp__
   for(pr in prs){
@@ -586,40 +586,93 @@ seeMCMC(mcmc,ch=F)
 ```
 Effect occur y=1 with probabilty p01, p11 from each cause x{0,1}
 event frequncy nxy of effect y{0,1} by cause x{0,1}
-n01~B(n0.,p01)
-n11~B(n1.,p11)
+n01~B(n0.,p0)
+n11~B(n1.,p1)
+
+n01=n0p0, n00=n0(1-p0)
+n11=n1p1, n10=n1(1-p1)
+
+p00=n00/n=n0(1-p0)/n, p01=n01/n=n0p0/n
+p10=n10/n=n1(1-p1)/n, p11=n11/n=n1p1/n
+
+Cramer'V  (chi2/n/(min(row,column)-1))^.5
+  in 2x2  
+  crv =(n11*n00-n10*n01)/(n0.*n1.*n.0*n.1)^.5
+      =(n0(1-p0)n1p1-n0p0n1(1-p1))/(n0n1(n0(1-p0)+n1(1-p1))(n0p0n1p1))^.5
+
+kappa coefficient   k=(po-pe)/(1-pe)
+  po: Observed agreement (proportion of times both raters agreed)
+  pe: Expected agreement under independence
+      po=p00+p11
+        =(n0(1-p0)+n1p1)/n
+      pe=(p00+p01)(p00+p10)(p10+p11)(p01+p11)
+        =n0/n*(n0(1-p0)+n1(1-p1))/n*(n0p0+n1p1)/n*n1/n
 ```
 
 ### ex16-1.stan
 ```
 data {
+  int n;
   int n0;
   int n01;
   int n1;
   int n11;
 }
 parameters {
-  real<lower=0,upper=1> p01;
-  real<lower=0,upper=1> p11;
+  real<lower=0,upper=1> p0;
+  real<lower=0,upper=1> p1;
 }
 model {
-  n01~binomial(n0,p01);
-  n11~binomial(n1,p11);
+  n01~binomial(n0,p0);
+  n11~binomial(n1,p1);
 }
 generated quantities {
   real RR;
-  RR=p11/p01;
+  RR=p1/p0;
   real OR;
-  OR=(p11/(1-p11))/(p01/(1-p01));
+  OR=(p1/(1-p1))/(p0/(1-p0));
+}
+```
+
+### ex16-2.stan
+```
+data {
+  int n;
+  int n0;
+  int n01;
+  int n1;
+  int n11;
+}
+parameters {
+  real<lower=0,upper=1> p0;
+  real<lower=0,upper=1> p1;
+}
+model {
+  n01~binomial(n0,p0);
+  n11~binomial(n1,p1);
+}
+generated quantities {
+  real RR;
+  RR=p1/p0;
+  real OR;
+  OR=(p1/(1-p1))/(p0/(1-p0));
+  real crv;
+  crv=(n0*(1-p0)*n1*p1-n0*p0*n1*(1-p1))/(n0*n1*(n0*(1-p0)+n1*(1-p1))*(n0*p0+n1*p1))^.5;
+  real k;
+  real po;
+  po=(n0*(1-p0)+n1*p1)/n;
+  real pe;
+  pe=n0/n*(n0*(1-p0)+n1*(1-p1))/n*(n0*p0+n1*p1)/n*n1/n;
+  k=(po-pe)/(1-pe);
 }
 ```
 
 ```{r}
-n0=20
+n0=30
 n01=rbinom(1,n0,0.3)
-n1=20
+n1=30
 n11=rbinom(1,n1,0.6)
-data=list(n0=n0,n01=n01,n1=n1,n11=n11)
+data=list(n=n0+n1,n0=n0,n01=n01,n1=n1,n11=n11)
 
 mdl=cmdstan_model('./ex16-1.stan')
 
@@ -630,6 +683,17 @@ mcmc=goMCMC(mdl,data)
 seeMCMC(mcmc,ch=F)
 ```
 
+```{r}
+data=list(n=n0+n1,n0=n0,n01=n01,n1=n1,n11=n11)
+
+mdl=cmdstan_model('./ex16-2.stan')
+
+mle=mdl$optimize(data=data)
+mle
+
+mcmc=goMCMC(mdl,data)
+seeMCMC(mcmc,ch=F)
+```
 
 
 
