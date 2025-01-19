@@ -697,65 +697,64 @@ seeMCMC(mcmc,ch=F)
 
 
 
-## bimodal distribution, mixed normal distribution
+## point of subjective equality PSE
+```
+PSE: 50% threshold for sensing the difference between two stimuli is equal
+JND: Just noticeable difference, difference between 50% threshold and 75%
 
-```{r}
-n=100
-y0=rnorm(n,0,1)
-y1=rnorm(n,-5,1)
-y2=rnorm(n,5,1)
-y=sample(c(y0,y1,y2),n)
-density(y) |> plot()
+r~B(n,p) #reaction for stimuli
+p=1/(1+exp(-(a+b*x)))
+x=x1-x0, x0,x1 is strength of stimuli
+
+PSE=-a/b
+JND=(log(0.75/0.25)-a)/b-PSE
 ```
 
-EM algorithm
-```{r}
-library(mclust)
-
-rst=Mclust(y)
-summary(rst)
-rst$parameters
-plot(rst)
+### ex6-3-0.stan
+mulit logistic regression
 ```
-
-### ex17-1.stan
-```
-data {
+data{
   int N;
-  vector[N] y;;
+  int m;
+  vector[N] x;
+  array[N] int y;
 }
-parameters {
-  simplex[3] h; //ratio of mix
-  real m1;
-  real m2;
-  real m3;
-  real<lower=0> s1;
-  real<lower=0> s2;
-  real<lower=0> s3;
+parameters{
+  real b0;
+  real b1;
 }
-model {
-  s1~cauchy(0,5);
-  s2~cauchy(0,5);
-  s3~cauchy(0,5);
-  for (i in 1:N) {
-    vector[3] p;
-    p[1]=log(h[1]) + normal_lpdf(y[i] | m1, s1);
-    p[2]=log(h[2]) + normal_lpdf(y[i] | m2, s2);
-    p[3]=log(h[3]) + normal_lpdf(y[i] | m3, s3);
-    target+=log_sum_exp(p);
-  }
+model{
+  y~binomial_logit(m,b0+b1*x);
 }
 ```
 
 ```{r}
-mdl=cmdstan_model('./ex17-1.stan')
+n=30
+m=10
+x=runif(n,-2,2)
+y=rbinom(n,m,1/(1+exp(-(-2+3*x))))
 
-data=list(N=n,y=y)
+glm(y/m~x,family=binomial('logit'))
+
+data=list(N=n,m=m,x=x,y=y)
+
+mdl=cmdstan_model('./ex6-3-0.stan')
+
 mle=mdl$optimize(data=data)
 mle
 
-mcmc=goMCMC(mdl,data,smp=2000)
+mcmc=goMCMC(mdl,data)
+
 seeMCMC(mcmc,ch=F)
+
+b0=mcmc$draws('b0')
+b1=mcmc$draws('b1')
+
+pse=as.vector(-b0/b1)
+quantile(pse,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1),na.rm=T)
+
+jnd=(log(0.75/0.25)-b0)/b1-pse
+quantile(jnd,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1),na.rm=T)
 ```
 
 
