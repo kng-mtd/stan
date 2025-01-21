@@ -729,7 +729,7 @@ model{
 ```
 
 ```{r}
-n=30
+n=20
 m=10
 x=runif(n,-2,2)
 y=rbinom(n,m,1/(1+exp(-(-2+3*x))))
@@ -747,14 +747,22 @@ mcmc=goMCMC(mdl,data)
 
 seeMCMC(mcmc,ch=F)
 
-b0=mcmc$draws('b0')
-b1=mcmc$draws('b1')
+b0=mcmc$draws('b0') |> as.vector()
+b1=mcmc$draws('b1') |> as.vector()
 
-pse=as.vector(-b0/b1)
+pse=-b0/b1
 quantile(pse,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1),na.rm=T)
 
 jnd=(log(0.75/0.25)-b0)/b1-pse
 quantile(jnd,probs=c(0.0,0.025,0.05,0.25,0.5,0.75,0.95,0.975,1),na.rm=T)
+
+
+x1=runif(length(b0),-2,2)
+p=1/(1+exp(-(b0+b1*x1)))
+pm=1/(1+exp(-(median(b0)+median(b1)*x1)))
+
+qplot(x1,pm,col=I('darkgray'),ylab='p')+
+  geom_line(aes(x=x1,p=p),col='red')
 ```
 
 
